@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- **Fixed: `marmalade_export.py` crashed on every run.** The config refactor in
+  0.1.4 introduced a local named `config` in `main()`, shadowing the module and
+  raising `UnboundLocalError` before anything rendered. Export was the one script
+  with no CI coverage, so nothing caught it.
+- **CI now renders.** The suite installs mermaid-cli and exports the bundled
+  templates to SVG, closing the last untested path in the toolchain. `release.yml`
+  additionally asserts the artifact is named `.zip`.
 - **Fixed: the release artifact was not loadable.** `release.yml` published
   `marmalade.plugin`, but `claude --plugin-dir` and `--plugin-url` accept a
   directory or a `.zip` and silently load nothing from an archive named anything

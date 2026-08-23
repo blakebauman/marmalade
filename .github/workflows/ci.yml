@@ -27,26 +27,15 @@ jobs:
             plugins/marmalade/scripts/lib \
             plugins/marmalade/scripts/hooks
 
-      - name: Every JSON manifest and theme parses
+      - name: Themes and hooks parse
         run: |
-          for f in .claude-plugin/marketplace.json \
-                   plugins/marmalade/.claude-plugin/plugin.json \
-                   plugins/marmalade/hooks/hooks.json \
+          for f in plugins/marmalade/hooks/hooks.json \
                    plugins/marmalade/assets/themes/*.json; do
             python -m json.tool "$f" > /dev/null || { echo "invalid: $f"; exit 1; }
           done
 
-      - name: Manifest versions agree
-        run: |
-          python - <<'PY'
-          import json, sys
-          mk = json.load(open(".claude-plugin/marketplace.json"))
-          pl = json.load(open("plugins/marmalade/.claude-plugin/plugin.json"))
-          entry = next(p for p in mk["plugins"] if p["name"] == pl["name"])
-          if entry.get("version") != pl.get("version"):
-              sys.exit(f"version mismatch: marketplace {entry.get('version')} != plugin {pl.get('version')}")
-          print(f"both at {pl['version']}")
-          PY
+      - name: Plugin structure validates
+        run: python scripts/validate.py
 
       - name: Mermaid sources lint clean
         run: python plugins/marmalade/scripts/marmalade_lint.py plugins/marmalade --errors-only

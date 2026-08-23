@@ -1,0 +1,151 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Scripts compile on the oldest supported Python
+        run: |
+          python -m compileall -q \
+            plugins/marmalade/scripts \
+            plugins/marmalade/scripts/lib \
+            plugins/marmalade/scripts/hooks
+
+      - name: Every JSON manifest and theme parses
+        run: |
+          for f in .claude-plugin/marketplace.json \
+                   plugins/marmalade/.claude-plugin/plugin.json \
+                   plugins/marmalade/hooks/hooks.json \
+                   plugins/marmalade/assets/themes/*.json; do
+            python -m json.tool "$f" > /dev/null || { echo "invalid: $f"; exit 1; }
+          done
+
+      - name: Manifest versions agree
+        run: |
+          python - <<'PY'
+          import json, sys
+          mk = json.load(open(".claude-plugin/marketplace.json"))
+          pl = json.load(open("plugins/marmalade/.claude-plugin/plugin.json"))
+          entry = next(p for p in mk["plugins"] if p["name"] == pl["name"])
+          if entry.get("version") != pl.get("version"):
+              sys.exit(f"version mismatch: marketplace {entry.get('version')} != plugin {pl.get('version')}")
+          print(f"both at {pl['version']}")
+          PY
+
+      - name: Mermaid sources lint clean
+        run: python plugins/marmalade/scripts/marmalade_lint.py plugins/marmalade --errors-only
+
+      - name: Bundled templates score 100 on the rubric
+        run: python plugins/marmalade/scripts/marmalade_slop.py plugins/marmalade/assets/templates --min-score 100
+
+      - name: Theme presets pass WCAG AA
+        run: |
+          for t in light dark high-contrast colorblind-safe print; do
+            python plugins/marmalade/scripts/check_contrast.py \
+              "plugins/marmalade/assets/themes/$t.json" || exit 1
+          done
+
+      - name: Hooks survive empty and malformed stdin
+        run: |
+          for h in session_context scan_secrets validate_on_write check_drift; do
+            printf '' | python "plugins/marmalade/scripts/hooks/$h.py" \
+              || { echo "$h failed on empty stdin"; exit 1; }
+            printf 'not json{{' | python "plugins/marmalade/scripts/hooks/$h.py" \
+              || { echo "$h failed on malformed stdin"; exit 1; }
+          done
+
+      - name: Detectors actually detect
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+
+          H = "plugins/marmalade/scripts/hooks"
+          fails = []
+
+          def hook(script, payload):
+              p = subprocess.run([sys.executable, f"{H}/{script}"],
+                                 input=json.dumps(payload), capture_output=True, text=True)
+              return p.stdout.strip()
+
+          # A credential in a diagram must be denied.
+          out = hook("scan_secrets.py", {"tool_name": "Write", "tool_input": {
+              "file_path": "a.mmd",
+              "content": "flowchart LR\n  A[db.corp.internal] --> B[10.0.0.5]\n"}})
+          if '"permissionDecision": "deny"' not in out:
+              fails.append("scan_secrets did not deny a leaking diagram")
+
+          # A clean diagram must be allowed.
+          out = hook("scan_secrets.py", {"tool_name": "Write", "tool_input": {
+              "file_path": "a.mmd",
+              "content": "flowchart LR\n  A[api.example.com] --> B[203.0.113.10]\n"}})
+          if out:
+              fails.append(f"scan_secrets flagged a clean diagram: {out[:120]}")
+
+          # A broken diagram must block.
+          out = hook("validate_on_write.py", {"tool_name": "Write", "tool_input": {
+              "file_path": "/tmp/x.mmd", "content": "flowchart XY\n  A --> \n"}})
+          if '"decision": "block"' not in out:
+              fails.append("validate_on_write did not block a broken diagram")
+
+          # A clean diagram must pass silently.
+          out = hook("validate_on_write.py", {"tool_name": "Write", "tool_input": {
+              "file_path": "/tmp/ok.mmd",
+              "content": "flowchart LR\n  accTitle: t\n  accDescr: d\n  A[Cart] -->|submits| B[(Queue)]\n"}})
+          if out:
+              fails.append(f"validate_on_write flagged a clean diagram: {out[:120]}")
+
+          # The rubric must score obvious slop below the acceptable band.
+          import tempfile, os
+          with tempfile.TemporaryDirectory() as d:
+              slop = os.path.join(d, "slop.mmd")
+              open(slop, "w").write(
+                  "flowchart TD\n" + "".join(
+                      f"  N{i}[Process] --> N{i+1}[Data]\n" for i in range(10)))
+              p = subprocess.run([sys.executable, "plugins/marmalade/scripts/marmalade_slop.py",
+                                  slop, "--json"], capture_output=True, text=True)
+              try:
+                  score = json.loads(p.stdout)["diagrams"][0]["score"]
+              except Exception:
+                  fails.append(f"slop scorer produced no parseable result: {p.stdout[:200]}")
+              else:
+                  if score >= 70:
+                      fails.append(f"obvious slop scored {score}, expected under 70")
+
+          for f in fails:
+              print("FAIL:", f)
+          sys.exit(1 if fails else 0)
+          PY
+
+      - name: Generators produce clean output
+        run: |
+          cat > /tmp/schema.sql <<'SQL'
+          CREATE TABLE customers (
+            id uuid PRIMARY KEY,
+            email varchar(255) NOT NULL UNIQUE
+          );
+          CREATE TABLE orders (
+            id uuid PRIMARY KEY,
+            customer_id uuid NOT NULL REFERENCES customers(id)
+          );
+          SQL
+          python plugins/marmalade/scripts/pg_erd.py --sql-file /tmp/schema.sql -o /tmp/erd.mmd
+          python plugins/marmalade/scripts/marmalade_lint.py /tmp/erd.mmd --errors-only
+
+          python plugins/marmalade/scripts/py_diagram.py plugins/marmalade/scripts -o /tmp/imports.mmd
+          python plugins/marmalade/scripts/marmalade_lint.py /tmp/imports.mmd --errors-only

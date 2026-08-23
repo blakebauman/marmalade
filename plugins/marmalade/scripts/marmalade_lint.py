@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+import config  # noqa: E402
 from mermaid_lint import Finding, extract_blocks, lint  # noqa: E402
 
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
@@ -61,7 +61,7 @@ def main() -> int:
     ap.add_argument("--quiet", action="store_true", help="Print nothing; use the exit code.")
     args = ap.parse_args()
 
-    roots = args.paths or [os.environ.get("MARMALADE_DIAGRAM_DIR", "docs/diagrams")]
+    roots = args.paths or [config.diagram_dir()]
     results: dict[str, list[Finding]] = {}
     for path in iter_paths(roots):
         found = lint_path(path)

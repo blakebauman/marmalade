@@ -17,7 +17,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -27,11 +26,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+import config  # noqa: E402
 from mermaid_lint import Block, extract_blocks, lint  # noqa: E402
 
 THEME_DIR = Path(__file__).resolve().parent.parent / "assets" / "themes"
 PRESETS = {"light", "dark", "high-contrast", "colorblind-safe", "print"}
-MANIFEST_NAME = ".Marmalade-manifest.json"
+MANIFEST_NAME = ".marmalade-manifest.json"
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
 
@@ -219,10 +219,11 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="Emit a machine-readable result.")
     args = ap.parse_args()
 
-    roots = args.paths or [os.environ.get("MARMALADE_DIAGRAM_DIR", "docs/diagrams")]
-    out_dir = Path(args.out or os.environ.get("MARMALADE_EXPORT_DIR", "docs/diagrams/rendered"))
-    theme_name = args.theme or os.environ.get("MARMALADE_THEME", "light")
-    formats = [f.strip().lower() for f in (args.format or os.environ.get("MARMALADE_FORMATS", "svg")).split(",") if f.strip()]
+    roots = args.paths or [config.diagram_dir()]
+    out_dir = Path(args.out or config.export_dir())
+    theme_name = args.theme or config.theme()
+    formats = ([f.strip().lower() for f in args.format.split(",") if f.strip()]
+               if args.format else config.formats())
 
     bad_formats = [f for f in formats if f not in ("svg", "png", "pdf")]
     if bad_formats:

@@ -8,11 +8,11 @@ unexpected exception exits 0 silently.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+import config  # noqa: E402
 
 
 def read_event() -> dict:
@@ -24,17 +24,13 @@ def read_event() -> dict:
 
 
 def option(key: str, default: str = "") -> str:
-    """Read a plugin userConfig value, which arrives as CLAUDE_PLUGIN_OPTION_<KEY>."""
-    return os.environ.get(f"CLAUDE_PLUGIN_OPTION_{key.upper()}", default)
+    """Read a setting. MARMALADE_<KEY> wins over the /plugin userConfig value,
+    so a hook and a CLI script in the same repo always agree. See lib/config.py."""
+    return config.setting(key, key, default)
 
 
 def flag(key: str, default: bool = True) -> bool:
-    raw = option(key, "").strip().lower()
-    if raw in ("1", "true", "yes", "on"):
-        return True
-    if raw in ("0", "false", "no", "off"):
-        return False
-    return default
+    return config.flag(key, key, default)
 
 
 def emit(payload: dict) -> None:

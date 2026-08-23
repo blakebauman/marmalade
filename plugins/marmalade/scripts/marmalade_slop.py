@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+import config  # noqa: E402
 from mermaid_lint import extract_blocks  # noqa: E402
 from slop import BUDGETS, DEFAULT_DETAIL, check  # noqa: E402
 
@@ -52,14 +52,14 @@ def verdict(score: int) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description="Score Mermaid diagrams against the no-slop rubric.")
     ap.add_argument("paths", nargs="*", help="Files or directories. Defaults to the configured diagram directory.")
-    ap.add_argument("--detail", default=os.environ.get("MARMALADE_DETAIL", DEFAULT_DETAIL),
+    ap.add_argument("--detail", default=config.detail(DEFAULT_DETAIL),
                     choices=sorted(BUDGETS), help=f"Density budget. Default {DEFAULT_DETAIL}.")
     ap.add_argument("--min-score", type=int, default=0, help="Exit 1 if any diagram scores below this.")
     ap.add_argument("--json", action="store_true", help="Emit machine-readable results.")
     ap.add_argument("--quiet", action="store_true", help="Only print diagrams that fall below --min-score.")
     args = ap.parse_args()
 
-    roots = args.paths or [os.environ.get("MARMALADE_DIAGRAM_DIR", "docs/diagrams")]
+    roots = args.paths or [config.diagram_dir()]
     results = []
 
     for path in collect(roots):

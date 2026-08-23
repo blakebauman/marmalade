@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Capitalise Marmalade in user-facing strings — hook messages, the doctor
+  header, and a slop hint had been lowercased by the rename.
+
 ## 0.1.0
 
 Initial release.

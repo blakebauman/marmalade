@@ -1,0 +1,29 @@
+---
+title: Upload path trust boundaries
+---
+flowchart LR
+    accTitle: Upload path trust boundaries
+    accDescr: Untrusted browser uploads cross into the application tier at the API gateway, and cross again into the storage tier when the scanner writes to the object store. Both crossings are the points where validation must happen.
+
+    subgraph Untrusted["Untrusted — public internet"]
+        User([Uploader])
+    end
+
+    subgraph App["Application tier"]
+        GW[API gateway]
+        Scan[Malware scanner]
+    end
+
+    subgraph Data["Storage tier"]
+        Bucket[(Object store)]
+        Meta[(Metadata DB)]
+    end
+
+    User -->|multipart upload| GW
+    GW -->|size + MIME + auth check| Scan
+    Scan -->|clean only| Bucket
+    Scan -->|record| Meta
+    Scan -->|quarantine| Quar[(Quarantine bucket)]
+
+    classDef risk fill:#fbe4dc,stroke:#D55E00,stroke-width:2px,color:#5a2000
+    class GW,Scan risk

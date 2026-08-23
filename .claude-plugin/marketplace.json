@@ -1,0 +1,36 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "marmalade",
+  "owner": {
+    "name": "Blake Bauman",
+    "email": "blake.bauman@gmail.com",
+    "url": "https://github.com/blakebauman"
+  },
+  "metadata": {
+    "description": "Mermaid diagrams as a first-class engineering artifact: authoring, export, theming, and a bench of UX/IA/a11y/security/DevOps/data reviewers.",
+    "pluginRoot": "./plugins"
+  },
+  "allowCrossMarketplaceDependenciesOn": ["impeccable"],
+  "plugins": [
+    {
+      "name": "marmalade",
+      "displayName": "Marmalade",
+      "source": "./plugins/marmalade",
+      "description": "Author, review, theme, and export Mermaid diagrams. Ships 10 skills, 12 expert subagents (UX, IA, accessibility, security, DevOps, Python, Postgres, DX, docs-sync), validation hooks, and a deterministic export/lint toolchain.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Blake Bauman",
+        "email": "blake.bauman@gmail.com"
+      },
+      "homepage": "https://github.com/blakebauman/marmalade",
+      "repository": "https://github.com/blakebauman/marmalade",
+      "license": "MIT",
+      "category": "documentation",
+      "keywords": ["mermaid", "diagrams", "documentation", "architecture", "erd", "accessibility", "design-review"],
+      "tags": ["mermaid", "diagrams-as-code", "docs", "ux", "ia", "accessibility", "security", "devops", "postgres", "python"],
+      "dependencies": [
+        { "name": "impeccable", "marketplace": "impeccable" }
+      ]
+    }
+  ]
+}

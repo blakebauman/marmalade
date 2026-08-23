@@ -1,0 +1,21 @@
+---
+title: Deployment lifecycle
+---
+stateDiagram-v2
+    accTitle: Deployment lifecycle
+    accDescr: A deployment moves from queued to building to canary. Canary either promotes to live or rolls back. Rollback and build failure both end in failed.
+
+    [*] --> Queued
+    Queued --> Building : runner picks up
+    Building --> Failed : build error
+    Building --> Canary : image pushed
+    Canary --> Live : error rate under 1% for 10 min
+    Canary --> RollingBack : error rate spike
+    RollingBack --> Failed
+    Live --> [*]
+    Failed --> [*]
+
+    note right of Canary
+        The only state that can
+        move backwards.
+    end note

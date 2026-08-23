@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "Copy this file, fill in the six TOKEN values, delete this _comment key, and pass it with --theme <path>.",
+    "Mermaid derives most of its palette from primaryColor, so set the tokens below and let it fill the rest.",
+    "Only the 'base' theme is customizable: keep \"theme\": \"base\".",
+    "Hex values only — Mermaid does not accept CSS color names.",
+    "Verify every pair with scripts/check_contrast.py before shipping."
+  ],
+  "theme": "base",
+  "fontFamily": "TOKEN_FONT_STACK",
+  "themeVariables": {
+    "darkMode": false,
+    "background": "TOKEN_SURFACE",
+    "fontSize": "15px",
+
+    "primaryColor": "TOKEN_BRAND_TINT",
+    "primaryTextColor": "TOKEN_INK",
+    "primaryBorderColor": "TOKEN_BRAND",
+
+    "secondaryColor": "TOKEN_BRAND_TINT",
+    "secondaryTextColor": "TOKEN_INK",
+    "secondaryBorderColor": "TOKEN_BRAND",
+
+    "tertiaryColor": "TOKEN_SURFACE",
+    "tertiaryTextColor": "TOKEN_INK",
+    "tertiaryBorderColor": "TOKEN_MUTED",
+
+    "mainBkg": "TOKEN_BRAND_TINT",
+    "nodeBorder": "TOKEN_BRAND",
+    "nodeTextColor": "TOKEN_INK",
+    "textColor": "TOKEN_INK",
+    "titleColor": "TOKEN_INK",
+
+    "lineColor": "TOKEN_MUTED",
+    "defaultLinkColor": "TOKEN_MUTED",
+    "edgeLabelBackground": "TOKEN_SURFACE",
+
+    "clusterBkg": "TOKEN_SURFACE",
+    "clusterBorder": "TOKEN_MUTED"
+  },
+  "flowchart": { "curve": "basis", "htmlLabels": true, "padding": 12 }
+}

@@ -1,0 +1,29 @@
+---
+title: Billing schema
+---
+erDiagram
+    accTitle: Billing schema
+    accDescr: A customer has many subscriptions; each subscription has many invoices and exactly one plan. Invoices have many line items.
+
+    CUSTOMER ||--o{ SUBSCRIPTION : "subscribes"
+    PLAN     ||--o{ SUBSCRIPTION : "priced by"
+    SUBSCRIPTION ||--o{ INVOICE  : "bills"
+    INVOICE  ||--o{ LINE_ITEM    : "itemizes"
+
+    CUSTOMER {
+        uuid id PK
+        citext email UK "not null"
+        timestamptz created_at "not null"
+    }
+    SUBSCRIPTION {
+        uuid id PK
+        uuid customer_id FK "not null"
+        uuid plan_id FK "not null"
+        text status "active | past_due | canceled"
+    }
+    INVOICE {
+        uuid id PK
+        uuid subscription_id FK "not null"
+        integer total_cents "not null"
+        timestamptz due_at
+    }

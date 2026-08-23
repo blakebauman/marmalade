@@ -1,0 +1,32 @@
+{
+  "theme": "neutral",
+  "fontFamily": "ui-sans-serif, -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif",
+  "themeVariables": {
+    "darkMode": false,
+    "background": "#ffffff",
+    "fontSize": "16px",
+    "primaryColor": "#f2f2f2",
+    "primaryTextColor": "#111111",
+    "primaryBorderColor": "#333333",
+    "secondaryColor": "#e0e0e0",
+    "secondaryTextColor": "#111111",
+    "secondaryBorderColor": "#333333",
+    "tertiaryColor": "#cccccc",
+    "tertiaryTextColor": "#111111",
+    "tertiaryBorderColor": "#333333",
+    "mainBkg": "#f2f2f2",
+    "nodeBorder": "#333333",
+    "nodeTextColor": "#111111",
+    "textColor": "#111111",
+    "lineColor": "#333333",
+    "defaultLinkColor": "#333333",
+    "edgeLabelBackground": "#ffffff",
+    "clusterBkg": "#fafafa",
+    "clusterBorder": "#777777",
+    "noteBkgColor": "#f2f2f2",
+    "noteTextColor": "#111111",
+    "noteBorderColor": "#555555"
+  },
+  "flowchart": { "curve": "linear", "htmlLabels": true, "padding": 14 },
+  "sequence": { "useMaxWidth": true }
+}

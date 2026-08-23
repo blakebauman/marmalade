@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "marmalade",
+  "displayName": "Marmalade",
+  "version": "0.1.0",
+  "description": "Author, review, theme, and export Mermaid diagrams. Ships 10 skills, 12 expert subagents (UX, IA, accessibility, security, DevOps, Python, Postgres, DX, docs-sync), validation hooks, and a deterministic export/lint toolchain.",
+  "author": {
+    "name": "Blake Bauman",
+    "email": "blake.bauman@gmail.com",
+    "url": "https://github.com/blakebauman"
+  },
+  "homepage": "https://github.com/blakebauman/marmalade",
+  "repository": "https://github.com/blakebauman/marmalade",
+  "license": "MIT",
+  "keywords": ["mermaid", "diagrams", "diagrams-as-code", "documentation", "architecture", "erd", "accessibility", "theming", "design-review"],
+  "dependencies": [
+    { "name": "impeccable", "marketplace": "impeccable" }
+  ],
+  "userConfig": {
+    "diagram_dir": {
+      "type": "string",
+      "title": "Diagram source directory",
+      "description": "Repo-relative directory where .mmd sources live. Used by export, drift detection, and docs sync.",
+      "default": "docs/diagrams"
+    },
+    "export_dir": {
+      "type": "string",
+      "title": "Rendered output directory",
+      "description": "Repo-relative directory where rendered SVG/PNG/PDF artifacts are written.",
+      "default": "docs/diagrams/rendered"
+    },
+    "default_theme": {
+      "type": "string",
+      "title": "Default theme preset",
+      "description": "Bundled preset used when no theme is named: light, dark, high-contrast, print, or brand.",
+      "default": "light"
+    },
+    "export_formats": {
+      "type": "string",
+      "title": "Default export formats",
+      "description": "Formats produced by a plain export run. Repeatable: svg, png, pdf.",
+      "multiple": true,
+      "default": "svg"
+    },
+    "strict_validation": {
+      "type": "boolean",
+      "title": "Block writes that fail validation",
+      "description": "When on, the PostToolUse hook blocks Claude on a Mermaid syntax error instead of only warning.",
+      "default": true
+    },
+    "secret_scan": {
+      "type": "boolean",
+      "title": "Scan diagrams for secrets and internal hostnames",
+      "description": "Runs a PreToolUse scan before a diagram is written, catching credentials, private IPs, and internal DNS names before they land in shared docs.",
+      "default": true
+    }
+  }
+}

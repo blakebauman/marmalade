@@ -1,0 +1,22 @@
+%% marmalade canonical classDefs — paste into any flowchart / state / class diagram.
+%% Five roles, no more. The whole point is that a reader learns the vocabulary once.
+%%
+%%   focal     the 1-2 nodes the diagram exists to point at. Accent color. Never more than 2.
+%%   primary   the system you own. Neutral tint.
+%%   external  something you call but do not control. Dashed border, no fill.
+%%   store     durable state. Use with a cylinder shape [(...)]; fill matches primary.
+%%   risk      the failure path, the trust boundary crossing, the thing on fire.
+%%
+%% Light surfaces (pairs with assets/themes/light.json and colorblind-safe.json):
+classDef focal    fill:#dbeaf5,stroke:#0072B2,stroke-width:2px,color:#062033
+classDef primary  fill:#f4f6f9,stroke:#5a6272,stroke-width:1px,color:#10203a
+classDef external fill:#ffffff,stroke:#767676,stroke-width:1px,stroke-dasharray:4 3,color:#3b414d
+classDef store    fill:#f4f6f9,stroke:#4a7a52,stroke-width:1px,color:#14261a
+classDef risk     fill:#fbe4dc,stroke:#D55E00,stroke-width:2px,color:#5a2000
+
+%% Dark surfaces (pairs with assets/themes/dark.json) — swap the block above for this one:
+%% classDef focal    fill:#1e2a3d,stroke:#7aa2f7,stroke-width:2px,color:#e6ebf3
+%% classDef primary  fill:#161b24,stroke:#9aa4b8,stroke-width:1px,color:#e6ebf3
+%% classDef external fill:#0f1218,stroke:#6b7488,stroke-width:1px,stroke-dasharray:4 3,color:#c3cbd9
+%% classDef store    fill:#161b24,stroke:#7fbf8a,stroke-width:1px,color:#e3efe6
+%% classDef risk     fill:#3a1c17,stroke:#e8836c,stroke-width:2px,color:#ffb4a6

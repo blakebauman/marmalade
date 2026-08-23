@@ -1,0 +1,29 @@
+---
+title: Request path
+---
+flowchart TB
+    accTitle: Request path
+    accDescr: Browser traffic enters through the CDN, hits the edge worker, and is served from cache or forwarded to the origin API, which reads Postgres and a Redis cache. Analytics events fan out to a queue consumed by the warehouse loader.
+
+    Browser([Browser]):::external
+
+    subgraph Edge["Edge"]
+        CDN[CDN] --> Worker[Edge worker]
+    end
+
+    subgraph Origin["Origin"]
+        API[API service]
+        DB[(Postgres)]
+        Cache[(Redis)]
+    end
+
+    Browser -->|HTTPS| CDN
+    Worker -->|cache miss| API
+    API -->|reads and writes| DB
+    API -->|session lookup| Cache
+    Worker -.->|page view events| Queue[(Event queue)]
+    Queue --> Loader[Warehouse loader]
+
+    classDef focal    fill:#dbeaf5,stroke:#0072B2,stroke-width:2px,color:#062033
+    classDef external fill:#ffffff,stroke:#767676,stroke-width:1px,stroke-dasharray:4 3,color:#3b414d
+    class Worker focal

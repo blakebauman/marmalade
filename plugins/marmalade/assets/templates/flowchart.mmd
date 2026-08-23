@@ -1,0 +1,21 @@
+---
+title: Order submission
+---
+flowchart LR
+    accTitle: Order submission
+    accDescr: A submitted cart is authorized by the payment provider. Authorized orders go to the warehouse; declined orders return to a retry queue that re-attempts once after five minutes before giving up.
+
+    Cart([Customer cart]) -->|submits| Auth{Payment<br/>authorized?}
+    Auth -->|yes| Pick[Warehouse pick list]
+    Auth -->|no| Retry[(Retry queue)]
+    Retry -->|once, after 5 min| Auth
+    Retry -->|second failure| Dead[Abandoned order report]
+
+    Stripe([Stripe API]):::external
+    Auth -.->|charge| Stripe
+
+    classDef focal    fill:#dbeaf5,stroke:#0072B2,stroke-width:2px,color:#062033
+    classDef external fill:#ffffff,stroke:#767676,stroke-width:1px,stroke-dasharray:4 3,color:#3b414d
+    classDef risk     fill:#fbe4dc,stroke:#D55E00,stroke-width:2px,color:#5a2000
+    class Auth focal
+    class Dead risk

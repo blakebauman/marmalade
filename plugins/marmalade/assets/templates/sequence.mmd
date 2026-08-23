@@ -1,0 +1,23 @@
+---
+title: Token refresh
+---
+sequenceDiagram
+    accTitle: Token refresh
+    accDescr: The browser retries a rejected API call once by exchanging its refresh token at the auth service, then replays the original request. A second rejection logs the user out.
+
+    participant B as Browser
+    participant A as API
+    participant Auth as Auth service
+
+    B->>A: GET /invoices (expired access token)
+    A-->>B: 401 token_expired
+
+    B->>Auth: POST /token (refresh token)
+    alt refresh token still valid
+        Auth-->>B: 200 new access token
+        B->>A: GET /invoices (retry)
+        A-->>B: 200 invoices
+    else refresh token revoked
+        Auth-->>B: 401 invalid_grant
+        Note over B: Clear session, redirect to login
+    end

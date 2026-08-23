@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.4
 
 - **`/marmalade:status`** — a read-only report on this project's diagram health:
   inventory, drift, rubric scores, and the one next command. `/marmalade:doctor`

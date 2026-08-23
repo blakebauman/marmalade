@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.3
+
+Two false positives in the secret scanner, both found by running it over 75 real
+documentation files. It flagged 6; it now flags 0, with every true positive still
+blocking.
+
+- **A CIDR block is not a host address.** `10.20.0.0/16` is how a VPC is
+  documented — RFC 1918 ranges are private by definition — so flagging it blocked
+  edits to every infrastructure diagram, including the ones this plugin's own
+  devops-diagrammer produces. A bare host like `10.4.2.17` still blocks.
+- **Prose is not a diagram.** With no Mermaid block found, the scanner fell back
+  to scanning the whole document, so a local dev DSN or an unrelated shell
+  example in a Markdown file blocked the edit. It now scans standalone `.mmd`
+  files whole, Markdown only inside its fences, and skips documents carrying no
+  diagram at all. Edit fragments that look like Mermaid are still scanned.
+- Link-local addresses are allowed: `169.254.169.254` is the cloud metadata
+  endpoint, identical everywhere, and reveals nothing.
+- All eleven cases are now CI regression tests.
+
 ## 0.1.2
 
 Calibrated against 39 hand-written diagrams across seven real repositories.

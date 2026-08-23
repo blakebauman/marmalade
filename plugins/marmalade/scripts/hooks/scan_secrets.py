@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hookio import edited_paths, emit, flag, is_diagram_carrier, read_event  # noqa: E402
 
-from mermaid_lint import extract_blocks  # noqa: E402
+from mermaid_lint import DIAGRAM_TYPES, extract_blocks  # noqa: E402
 
 # (label, pattern, why it matters). Ordered most-specific first.
 PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
@@ -57,19 +57,34 @@ DOC_NETS = [
     ipaddress.ip_network("2001:db8::/32"),
 ]
 IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+# A trailing /nn makes it a CIDR block: the shape of a network, not a machine on it.
+CIDR_SUFFIX = re.compile(r"\s*/\s*\d{1,2}\b")
 
 
 def private_ips(text: str) -> list[str]:
+    """Private host addresses only.
+
+    A CIDR range such as 10.20.0.0/16 is how a VPC is documented — RFC 1918
+    ranges are private by definition, so flagging them would block every
+    infrastructure diagram. A bare host address like 10.4.2.17 is a real machine
+    and is what actually leaks.
+    """
     found = []
-    for candidate in IPV4.findall(text):
+    for match in IPV4.finditer(text):
+        if CIDR_SUFFIX.match(text, match.end()):
+            continue
         try:
-            addr = ipaddress.ip_address(candidate)
+            addr = ipaddress.ip_address(match.group(0))
         except ValueError:
             continue
         if any(addr in net for net in DOC_NETS):
             continue
+        # Link-local covers the cloud metadata endpoint (169.254.169.254), which
+        # is identical on every host everywhere and reveals nothing.
+        if addr.is_link_local:
+            continue
         if addr.is_private and not addr.is_loopback and not addr.is_unspecified:
-            found.append(candidate)
+            found.append(match.group(0))
     return found
 
 
@@ -84,6 +99,18 @@ def scan(text: str) -> list[str]:
             f"private IP address(es) {', '.join(ips[:4])} — real internal addressing, not documentation placeholders"
         )
     return hits
+
+
+def looks_like_mermaid(text: str) -> bool:
+    """Whether a fragment that did not parse as a block is still diagram source."""
+    if "```mermaid" in text.lower():
+        return True
+    for line in text.splitlines():
+        stripped = line.strip()
+        for keyword in DIAGRAM_TYPES:
+            if stripped == keyword or stripped.startswith(keyword + " "):
+                return True
+    return False
 
 
 def main() -> int:
@@ -104,9 +131,20 @@ def main() -> int:
     if not any(is_diagram_carrier(p) for p in paths):
         return 0
 
-    blocks = extract_blocks(paths[0], payload)
-    # An Edit replaces a fragment, so a bare fragment may not parse as a block.
-    scan_text = "\n".join(b.source for b in blocks) if blocks else payload
+    path = paths[0]
+    blocks = extract_blocks(path, payload)
+    if blocks:
+        scan_text = "\n".join(b.source for b in blocks)
+    elif path.lower().endswith((".mmd", ".mermaid")):
+        # The whole file is a diagram, even if an Edit fragment does not parse.
+        scan_text = payload
+    elif looks_like_mermaid(payload):
+        # An Edit fragment of a fenced diagram inside a Markdown file.
+        scan_text = payload
+    else:
+        # Markdown carrying no diagram at all. This is a diagram scanner: prose,
+        # shell examples, and local dev connection strings are not its business.
+        return 0
 
     hits = scan(scan_text)
     if not hits:

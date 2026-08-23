@@ -83,19 +83,27 @@ jobs:
                                  input=json.dumps(payload), capture_output=True, text=True)
               return p.stdout.strip()
 
-          # A credential in a diagram must be denied.
-          out = hook("scan_secrets.py", {"tool_name": "Write", "tool_input": {
-              "file_path": "a.mmd",
-              "content": "flowchart LR\n  A[db.corp.internal] --> B[10.0.0.5]\n"}})
-          if '"permissionDecision": "deny"' not in out:
-              fails.append("scan_secrets did not deny a leaking diagram")
-
-          # A clean diagram must be allowed.
-          out = hook("scan_secrets.py", {"tool_name": "Write", "tool_input": {
-              "file_path": "a.mmd",
-              "content": "flowchart LR\n  A[api.example.com] --> B[203.0.113.10]\n"}})
-          if out:
-              fails.append(f"scan_secrets flagged a clean diagram: {out[:120]}")
+          # The secret scanner, in both directions. Every ALLOW case here is a
+          # false positive found by running the scanner over 75 real doc files.
+          CASES = [
+              ("allow", "VPC CIDR",              "a.mmd", "flowchart LR\n  subgraph vpc [VPC 10.20.0.0/16]\n    A[api]\n  end\n"),
+              ("allow", "cloud metadata IP",     "a.mmd", "flowchart LR\n  A[app] --> B[169.254.169.254]\n"),
+              ("allow", "RFC5737 doc range",     "a.mmd", "flowchart LR\n  A[203.0.113.10]\n"),
+              ("allow", "prose with no diagram", "d.md",  "# Setup\n\nRun postgres://postgres:test@127.0.0.1:5455/db\nSee kafka.corp.internal\n"),
+              ("deny",  "bare private host",     "a.mmd", "flowchart LR\n  A[db] --> B[10.4.2.17]\n"),
+              ("deny",  "host with port",        "a.mmd", "flowchart LR\n  A[broker 192.168.1.50:9092]\n"),
+              ("deny",  "internal DNS",          "a.mmd", "flowchart LR\n  A[kafka.corp.internal]\n"),
+              ("deny",  "credentials in a URI",  "a.mmd", 'flowchart LR\n  A["postgres://u:pw123456@db/x"]\n'),
+              ("deny",  "leak inside a fence",   "d.md",  "# Doc\n\n```mermaid\nflowchart LR\n  A[10.4.2.17]\n```\n"),
+              ("deny",  "AWS access key",        "a.mmd", "flowchart LR\n  A[AKIAIOSFODNN7EXAMPLE]\n"),
+              ("deny",  "edit fragment",         "d.md",  "flowchart LR\n  A[db.corp.internal] --> B\n"),
+          ]
+          for want, label, path, content in CASES:
+              out = hook("scan_secrets.py", {"tool_name": "Write",
+                                             "tool_input": {"file_path": path, "content": content}})
+              got = "deny" if out else "allow"
+              if got != want:
+                  fails.append(f"scan_secrets {got} on {label!r}, expected {want}")
 
           # A broken diagram must block.
           out = hook("validate_on_write.py", {"tool_name": "Write", "tool_input": {

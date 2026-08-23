@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.5
 
 - **Fixed: `marmalade_export.py` crashed on every run.** The config refactor in
   0.1.4 introduced a local named `config` in `main()`, shadowing the module and

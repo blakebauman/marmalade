@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+import config  # noqa: E402
 
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 OK, WARN, FAIL = "✓", "!", "✗"
@@ -53,13 +55,14 @@ def main() -> int:
     templates = sorted(p.name for p in (PLUGIN_ROOT / "assets" / "templates").glob("*.mmd"))
     rows.append((OK if templates else FAIL, "templates", f"{len(templates)} available"))
 
-    for key, default in (("diagram_dir", "docs/diagrams"), ("export_dir", "docs/diagrams/rendered"),
-                         ("default_theme", "light")):
-        value = os.environ.get(f"CLAUDE_PLUGIN_OPTION_{key.upper()}")
+    for key, env, default in (("diagram_dir", "DIAGRAM_DIR", "docs/diagrams"),
+                              ("export_dir", "EXPORT_DIR", "docs/diagrams/rendered"),
+                              ("default_theme", "THEME", "light")):
+        value = config.setting(env, key, "")
         rows.append((OK, f"config: {key}", value or f"{default} (default)"))
 
     cwd = Path.cwd()
-    diagram_dir = cwd / (os.environ.get("CLAUDE_PLUGIN_OPTION_DIAGRAM_DIR") or "docs/diagrams")
+    diagram_dir = cwd / config.diagram_dir()
     if diagram_dir.is_dir():
         count = len(list(diagram_dir.rglob("*.mmd"))) + len(list(diagram_dir.rglob("*.mermaid")))
         rows.append((OK, "diagram directory", f"{diagram_dir} — {count} source file(s)"))

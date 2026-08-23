@@ -12,10 +12,26 @@
   "homepage": "https://github.com/blakebauman/marmalade",
   "repository": "https://github.com/blakebauman/marmalade",
   "license": "MIT",
-  "keywords": ["mermaid", "diagrams", "diagrams-as-code", "documentation", "architecture", "erd", "accessibility", "theming", "design-review"],
-  "dependencies": [
-    { "name": "impeccable", "marketplace": "impeccable" }
+  "keywords": [
+    "mermaid",
+    "diagrams",
+    "diagrams-as-code",
+    "documentation",
+    "architecture",
+    "erd",
+    "accessibility",
+    "theming",
+    "design-review"
   ],
+  "dependencies": [
+    {
+      "name": "impeccable",
+      "marketplace": "impeccable"
+    }
+  ],
+  "experimental": {
+    "evals": "evals"
+  },
   "userConfig": {
     "diagram_dir": {
       "type": "string",

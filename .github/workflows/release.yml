@@ -1,0 +1,53 @@
+name: release
+
+# Build the installable .plugin and attach it to a GitHub Release whenever a
+# version tag (e.g. v0.1.4) is pushed.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.9"
+
+      - name: Plugin structure validates
+        run: python scripts/validate.py
+
+      - name: Tag matches the manifest version
+        run: |
+          python - <<'PY'
+          import json, os, sys
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          version = json.load(open("plugins/marmalade/.claude-plugin/plugin.json"))["version"]
+          if tag != version:
+              sys.exit(f"tag {tag!r} does not match plugin.json version {version!r}")
+          print(f"tag and manifest agree at {version}")
+          PY
+
+      - name: Build marmalade.plugin
+        run: |
+          cd plugins/marmalade
+          zip -r ../../marmalade.plugin . -x "*.DS_Store" "__pycache__/*" "*/__pycache__/*" "*.pyc"
+          cd ../..
+          echo "Built marmalade.plugin:"
+          unzip -l marmalade.plugin | tail -3
+          # The manifest must sit at the archive root, or the plugin will not install.
+          unzip -l marmalade.plugin | grep -q " .claude-plugin/plugin.json$" \
+            || { echo "plugin.json is not at the archive root"; exit 1; }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: marmalade.plugin
+          generate_release_notes: true

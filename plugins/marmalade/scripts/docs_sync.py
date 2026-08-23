@@ -19,15 +19,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+import config  # noqa: E402
 from mermaid_lint import extract_blocks  # noqa: E402
 
-MANIFEST_NAME = ".Marmalade-manifest.json"
+MANIFEST_NAME = ".marmalade-manifest.json"
 RENDERED_EXT = (".svg", ".png", ".pdf")
 DOC_EXT = (".md", ".markdown", ".mdx", ".qmd", ".rst", ".html")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
@@ -58,8 +58,8 @@ def source_digests(diagram_dir: Path) -> dict[str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Detect drift between Mermaid sources, renders, and docs.")
-    ap.add_argument("--diagrams", default=os.environ.get("MARMALADE_DIAGRAM_DIR", "docs/diagrams"))
-    ap.add_argument("--rendered", default=os.environ.get("MARMALADE_EXPORT_DIR", "docs/diagrams/rendered"))
+    ap.add_argument("--diagrams", default=config.diagram_dir())
+    ap.add_argument("--rendered", default=config.export_dir())
     ap.add_argument("--docs", default=".", help="Root to scan for documents referencing rendered images.")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()

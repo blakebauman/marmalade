@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+- **`/marmalade:status`** — a read-only report on this project's diagram health:
+  inventory, drift, rubric scores, and the one next command. `/marmalade:doctor`
+  checks the environment; this checks the diagrams.
+- **Config is resolved in one place.** `scripts/lib/config.py` applies a single
+  precedence — explicit flag, then `MARMALADE_*`, then the `/plugin` userConfig,
+  then the default. Previously the hooks honoured userConfig and the CLI scripts
+  honoured `MARMALADE_*` with nothing bridging them, so a `diagram_dir` set in
+  `/plugin` was obeyed by the drift hook and ignored by export, slop, lint and
+  sync.
+- **Fixed: the render manifest filename.** The code wrote
+  `.Marmalade-manifest.json` while the docs said `.marmalade-manifest.json`; on a
+  case-sensitive filesystem anyone following the docs never found it. The
+  lowercase spelling is now correct everywhere. Existing users get one extra
+  re-render as the old manifest is ignored.
+- **`scripts/validate.py`** — structural validation of the plugin itself: manifest
+  agreement, frontmatter, `${CLAUDE_PLUGIN_ROOT}` paths that actually resolve,
+  agent-to-skill references, preset/theme agreement, and the duplicated
+  README/LICENSE pairs. Wired into CI, replacing the ad-hoc JSON and version
+  checks.
+- **Eval suite** — five cases under `plugins/marmalade/evals/`, including an
+  adversarial case where padding the diagram is the failure. Deterministic
+  graders shell out to the slop scorer and linter; `scripts/run_evals.py` runs
+  them with a with/without-plugin ablation until `claude plugin eval` leaves
+  early access.
+- **Releases** — pushing a `v*` tag now builds `marmalade.plugin` and attaches it
+  to a GitHub Release.
+- **Docs** — `CONTRIBUTING.md`, `AGENTS.md`, `docs/install.md`, and
+  `docs/evaluating-skills.md`.
+
 ## 0.1.3
 
 Two false positives in the secret scanner, both found by running it over 75 real

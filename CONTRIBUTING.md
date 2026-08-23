@@ -123,7 +123,7 @@ byte-identical. Edit both; the validator compares them.
 python3 scripts/validate.py
 
 # the same artifact CI builds on a tag:
-cd plugins/marmalade && zip -r ../../marmalade.plugin . -x "*.DS_Store"
+cd plugins/marmalade && zip -r ../../marmalade.zip . -x "*.DS_Store"
 ```
 
 ## Releasing
@@ -131,7 +131,7 @@ cd plugins/marmalade && zip -r ../../marmalade.plugin . -x "*.DS_Store"
 1. Bump the version in both manifests.
 2. Add a `plugins/marmalade/CHANGELOG.md` entry.
 3. Tag `vX.Y.Z` and push it. `.github/workflows/release.yml` validates, builds
-   `marmalade.plugin`, and attaches it to a GitHub Release with generated notes.
+   `marmalade.zip`, and attaches it to a GitHub Release with generated notes.
 
 ## Commit style
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed: the release artifact was not loadable.** `release.yml` published
+  `marmalade.plugin`, but `claude --plugin-dir` and `--plugin-url` accept a
+  directory or a `.zip` and silently load nothing from an archive named anything
+  else. The artifact is now `marmalade.zip`. The 0.1.4 release has been given a
+  working asset.
+
 ## 0.1.4
 
 - **`/marmalade:status`** — a read-only report on this project's diagram health:

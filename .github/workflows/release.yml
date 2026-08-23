@@ -1,6 +1,6 @@
 name: release
 
-# Build the installable .plugin and attach it to a GitHub Release whenever a
+# Build the installable plugin zip and attach it to a GitHub Release whenever a
 # version tag (e.g. v0.1.4) is pushed.
 
 on:
@@ -35,19 +35,22 @@ jobs:
           print(f"tag and manifest agree at {version}")
           PY
 
-      - name: Build marmalade.plugin
+      - name: Build marmalade.zip
         run: |
           cd plugins/marmalade
-          zip -r ../../marmalade.plugin . -x "*.DS_Store" "__pycache__/*" "*/__pycache__/*" "*.pyc"
+          zip -r ../../marmalade.zip . -x "*.DS_Store" "__pycache__/*" "*/__pycache__/*" "*.pyc"
           cd ../..
-          echo "Built marmalade.plugin:"
-          unzip -l marmalade.plugin | tail -3
+          # The .zip extension is load-bearing: `claude --plugin-dir` and
+          # `--plugin-url` accept a directory or a .zip, and silently load
+          # nothing when handed the same archive named anything else.
+          echo "Built marmalade.zip:"
+          unzip -l marmalade.zip | tail -3
           # The manifest must sit at the archive root, or the plugin will not install.
-          unzip -l marmalade.plugin | grep -q " .claude-plugin/plugin.json$" \
+          unzip -l marmalade.zip | grep -q " .claude-plugin/plugin.json$" \
             || { echo "plugin.json is not at the archive root"; exit 1; }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: marmalade.plugin
+          files: marmalade.zip
           generate_release_notes: true

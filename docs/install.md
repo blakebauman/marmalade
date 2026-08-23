@@ -74,8 +74,15 @@ Commit `.claude/settings.json` so everyone on the repo gets the same version:
 
 ### From a release artifact
 
-Every `v*` tag publishes `marmalade.plugin` on the GitHub Release. Unzip it into
-your plugins directory if you would rather pin a build than track a branch.
+Every `v*` tag publishes `marmalade.zip` on the GitHub Release. Load it directly
+for a single session, without installing anything:
+
+```bash
+claude --plugin-dir ./marmalade.zip
+```
+
+`--plugin-dir` takes a directory or a `.zip`; `--plugin-url` takes the release
+asset URL. Either is a good way to pin a build rather than track a branch.
 
 ## Claude Code — manual copy (no plugin system)
 

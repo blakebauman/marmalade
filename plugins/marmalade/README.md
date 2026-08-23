@@ -172,6 +172,7 @@ questions were deleted.
 | `/marmalade:erd` | ERD from a live Postgres database or a DDL file |
 | `/marmalade:sync` | Find every way diagrams, images, and docs have drifted apart |
 | `/marmalade:doctor` | Check the environment and say what to install |
+| `/marmalade:status` | Report this project's diagram health — inventory, drift, scores, next step |
 
 ## The reviewer bench
 
@@ -278,6 +279,19 @@ plugins/marmalade/
 ```
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard.
+
+## Contributing
+
+Rules, recipes, and the release procedure are in
+[CONTRIBUTING.md](CONTRIBUTING.md); [AGENTS.md](AGENTS.md) is the short form for
+coding agents. Everything both documents claim is enforced:
+
+```bash
+python3 scripts/validate.py
+```
+
+Installing on other hosts: [docs/install.md](docs/install.md). Evaluating the
+skills: [docs/evaluating-skills.md](docs/evaluating-skills.md).
 
 ## Licence
 

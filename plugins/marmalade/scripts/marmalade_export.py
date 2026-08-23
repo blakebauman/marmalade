@@ -230,8 +230,8 @@ def main() -> int:
         print(f"Unsupported format(s): {', '.join(bad_formats)}. mermaid-cli renders svg, png, pdf.", file=sys.stderr)
         return 2
 
-    config = resolve_theme(theme_name)
-    background = theme_background(config, args.background)
+    theme_path = resolve_theme(theme_name)
+    background = theme_background(theme_path, args.background)
 
     jobs = build_jobs(collect(roots))
     dedupe_stems(jobs)
@@ -296,7 +296,7 @@ def main() -> int:
             if key not in stale:
                 continue
             ok, err = render(
-                base_cmd, job.block.source, out_dir / key, config, background, args.scale, args.width, css, puppeteer
+                base_cmd, job.block.source, out_dir / key, theme_path, background, args.scale, args.width, css, puppeteer
             )
             if ok:
                 rendered.append(key)

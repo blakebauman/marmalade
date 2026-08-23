@@ -42,7 +42,9 @@ jobs:
           cd ../..
           # The .zip extension is load-bearing: `claude --plugin-dir` and
           # `--plugin-url` accept a directory or a .zip, and silently load
-          # nothing when handed the same archive named anything else.
+          # nothing when handed the same archive named anything else. 0.1.4
+          # shipped an unloadable artifact this way.
+          ls marmalade.zip >/dev/null || { echo "artifact must be named *.zip"; exit 1; }
           echo "Built marmalade.zip:"
           unzip -l marmalade.zip | tail -3
           # The manifest must sit at the archive root, or the plugin will not install.

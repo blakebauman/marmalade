@@ -122,9 +122,17 @@ byte-identical. Edit both; the validator compares them.
 ```bash
 python3 scripts/validate.py
 
+# the official schema check, complementary to the structural one above:
+claude plugin validate plugins/marmalade
+claude plugin validate .
+
 # the same artifact CI builds on a tag:
 cd plugins/marmalade && zip -r ../../marmalade.zip . -x "*.DS_Store"
 ```
+
+The artifact must be named `.zip`. `claude --plugin-dir` accepts a directory or
+a `.zip` and silently loads nothing from an archive named anything else — check
+a build with `claude --plugin-dir ./marmalade.zip` before tagging.
 
 ## Releasing
 

@@ -129,6 +129,34 @@ jobs:
           sys.exit(1 if fails else 0)
           PY
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Diagrams actually render
+        # The only path the rest of the suite cannot reach: everything else is
+        # pure Python, but export shells out to mermaid-cli and a headless
+        # browser. A shadowed import shipped in 0.1.4 because nothing here ever
+        # invoked it.
+        run: |
+          npm install -g @mermaid-js/mermaid-cli
+          echo '{"args":["--no-sandbox","--disable-setuid-sandbox"]}' > /tmp/pptr.json
+          # classdefs.mmd is a paste-in vocabulary fragment with no diagram
+          # header, so it is deliberately not renderable. Copy the rest rather
+          # than word-splitting a path list, which behaves differently per shell.
+          mkdir -p /tmp/tpl
+          cp plugins/marmalade/assets/templates/*.mmd /tmp/tpl/
+          rm -f /tmp/tpl/classdefs.mmd
+          python plugins/marmalade/scripts/marmalade_export.py /tmp/tpl \
+            --format svg --out /tmp/rendered --puppeteer-config /tmp/pptr.json
+          count=$(ls /tmp/rendered/*.svg | wc -l)
+          test "$count" -eq 6 || { echo "expected 6 SVGs, got $count"; exit 1; }
+          # A zero-byte or error SVG still counts as a file; check it drew something.
+          for f in /tmp/rendered/*.svg; do
+            grep -q "<svg" "$f" || { echo "$f is not an SVG"; exit 1; }
+          done
+          echo "rendered $count diagrams"
+
       - name: Generators produce clean output
         run: |
           cat > /tmp/schema.sql <<'SQL'

@@ -20,7 +20,7 @@ SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", 
 DOC_EXT = (".md", ".markdown", ".mdx", ".qmd")
 CONFIG_NAMES = (
     ".mermaidrc", ".mermaidrc.json", "mermaid.config.json",
-    ".marmalade.json", "mermaid.json", ".puppeteerrc.json",
+    ".Marmalade.json", "mermaid.json", ".puppeteerrc.json",
 )
 MAX_WALK = 4000
 
@@ -68,7 +68,7 @@ def main() -> int:
 
     renderer = "mmdc" if shutil.which("mmdc") else ("npx @mermaid-js/mermaid-cli" if shutil.which("npx") else None)
 
-    lines = ["marmalade — Mermaid setup detected in this repository:"]
+    lines = ["Marmalade — Mermaid setup detected in this repository:"]
     if sources:
         lines.append(f"  • {len(sources)} standalone .mmd/.mermaid source file(s)")
     if docs_with_diagrams:
@@ -82,7 +82,7 @@ def main() -> int:
         else "  • No Mermaid renderer on PATH. Export needs `npm i -g @mermaid-js/mermaid-cli` or npx."
     )
     lines.append(
-        "When editing these diagrams, prefer the marmalade skills (authoring, theming, review, export) over "
+        "When editing these diagrams, prefer the Marmalade skills (authoring, theming, review, export) over "
         "ad-hoc edits, and keep exported artifacts in step with their sources."
     )
 

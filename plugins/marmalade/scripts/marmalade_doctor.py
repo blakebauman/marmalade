@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check that everything marmalade needs is present, and say what to do if not."""
+"""Check that everything Marmalade needs is present, and say what to do if not."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def main() -> int:
         rows.append((WARN, "diagram directory", f"{diagram_dir} does not exist yet"))
 
     width = max(len(label) for _s, label, _d in rows)
-    print("marmalade doctor\n")
+    print("Marmalade doctor\n")
     for status, label, detail in rows:
         print(f"  {status} {label.ljust(width)}  {detail}")
 

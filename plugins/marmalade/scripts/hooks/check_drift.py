@@ -69,7 +69,7 @@ def main() -> int:
         more = f" (+{len(unrendered) - MAX_LISTED} more)" if len(unrendered) > MAX_LISTED else ""
         parts.append(f"{len(unrendered)} source(s) with no rendered output: {listed}{more}")
 
-    emit({"systemMessage": "marmalade drift check — " + " | ".join(parts) + ". Run /marmalade:export to refresh."})
+    emit({"systemMessage": "Marmalade drift check — " + " | ".join(parts) + ". Run /marmalade:export to refresh."})
     return 0
 
 

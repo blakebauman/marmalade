@@ -118,7 +118,7 @@ def main() -> int:
                 "hookEventName": "PreToolUse",
                 "permissionDecision": "deny",
                 "permissionDecisionReason": (
-                    "marmalade blocked this diagram write — it contains material that should not ship in a diagram:\n"
+                    "Marmalade blocked this diagram write — it contains material that should not ship in a diagram:\n"
                     + "\n".join(f"  • {h}" for h in hits)
                     + "\n\nDiagrams get pasted into tickets, READMEs, and decks, so treat this as a publish, not a "
                     "local file. Replace the value with a placeholder (`<API_KEY>`, `db.example.com`, an RFC 5737 "

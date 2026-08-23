@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 from mermaid_lint import extract_blocks  # noqa: E402
 
-MANIFEST_NAME = ".marmalade-manifest.json"
+MANIFEST_NAME = ".Marmalade-manifest.json"
 RENDERED_EXT = (".svg", ".png", ".pdf")
 DOC_EXT = (".md", ".markdown", ".mdx", ".qmd", ".rst", ".html")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
@@ -85,7 +85,7 @@ def main() -> int:
         for name in matching:
             recorded = manifest.get(name, {}).get("digest")
             if recorded is None:
-                stale.append(f"{name} (not in manifest — rendered outside marmalade, or manifest deleted)")
+                stale.append(f"{name} (not in manifest — rendered outside Marmalade, or manifest deleted)")
             elif recorded != digest:
                 stale.append(f"{name} (source changed since render)")
 

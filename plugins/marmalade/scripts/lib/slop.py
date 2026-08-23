@@ -302,7 +302,7 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
                 severity="info",
                 code="SLOP012",
                 message="Diagram carries no theme or title metadata.",
-                hint="Default Mermaid is a recognizable look. Add a `--- title: … ---` frontmatter block and render with a marmalade theme preset so it reads as part of your docs, not as output.",
+                hint="Default Mermaid is a recognizable look. Add a `--- title: … ---` frontmatter block and render with a Marmalade theme preset so it reads as part of your docs, not as output.",
             )
         )
 

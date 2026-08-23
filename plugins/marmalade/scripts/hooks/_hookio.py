@@ -1,4 +1,4 @@
-"""Shared plumbing for marmalade hooks.
+"""Shared plumbing for Marmalade hooks.
 
 Hooks run inside someone's editing session. The contract every script here
 follows: read stdin, do one small job, and never crash the session. Any

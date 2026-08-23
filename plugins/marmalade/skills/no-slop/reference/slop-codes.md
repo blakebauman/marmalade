@@ -161,5 +161,5 @@ diagram or into `accDescr`.
 **Why it matters.** Default Mermaid is a recognizable look, and increasingly it is
 recognizable specifically as unedited generated output.
 
-**Fix.** Add a `--- title: … ---` block and render with a marmalade theme preset so
+**Fix.** Add a `--- title: … ---` block and render with a Marmalade theme preset so
 the diagram reads as part of your documentation rather than as output pasted into it.

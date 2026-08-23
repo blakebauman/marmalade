@@ -31,7 +31,7 @@ from mermaid_lint import Block, extract_blocks, lint  # noqa: E402
 
 THEME_DIR = Path(__file__).resolve().parent.parent / "assets" / "themes"
 PRESETS = {"light", "dark", "high-contrast", "colorblind-safe", "print"}
-MANIFEST_NAME = ".marmalade-manifest.json"
+MANIFEST_NAME = ".Marmalade-manifest.json"
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
 
@@ -279,7 +279,7 @@ def main() -> int:
         print(
             "No Mermaid renderer available. Install one of:\n"
             "  npm install -g @mermaid-js/mermaid-cli    (provides `mmdc`)\n"
-            "  # or make `npx` available so marmalade can run mermaid-cli on demand",
+            "  # or make `npx` available so Marmalade can run mermaid-cli on demand",
             file=sys.stderr,
         )
         return 2

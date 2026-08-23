@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2
+
+Calibrated against 39 hand-written diagrams across seven real repositories.
+
+- **SLOP012 is now scoped to standalone `.mmd` files.** It fired on 35 of the 39
+  and carried no information: a fenced block inherits its docs platform's theme,
+  so there is no default-Mermaid look to complain about. Only a `.mmd` headed
+  for export actually ships one. Clean count on the sample went from 12 to 19.
+- README gains a *Seen on real diagrams* section with the survey results and a
+  before/after worked example (70/100 → 100/100).
+
 ## 0.1.1
 
 - Capitalise Marmalade in user-facing strings — hook messages, the doctor

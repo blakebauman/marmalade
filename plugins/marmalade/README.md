@@ -53,6 +53,113 @@ docs/diagrams/architecture.mmd — 55/100 (slop-leaning), 8 nodes / 7 edges, bud
   ! line 2  SLOP002  Label 'Process' names a shape, not a thing in the system.
 ```
 
+## Seen on real diagrams
+
+Pointed at seven private repositories — 39 diagrams, all hand-written Markdown
+fences, none generated:
+
+```
+39 diagrams, average 87/100
+  19 clean, 20 acceptable, 0 slop
+
+  SLOP007  x23   nothing in the diagram is emphasized
+  SLOP004  x17   most edges do not say what they mean
+  SLOP001  x10   over the density budget
+  SLOP011  x1    a label the length of a sentence
+  SLOP005  x1    every node the same shape
+  SLOP010  x1    the same label on two nodes
+  SLOP003  x1    a hedging label
+```
+
+Two things that survey settled. Nothing hand-written scored below 70 — the
+rubric separates generated slop from ordinary human documentation rather than
+scolding everything. And the failure that dominates real docs is not ugliness,
+it is **no focal point and unlabelled edges**: diagrams that show what connects
+to what while staying silent about what matters and why.
+
+It also found a bug in the rubric. `SLOP012` fired on 35 of the 39, which means
+it carried no information. A fenced block inherits its docs platform's theme, so
+there is no default-Mermaid look to complain about; only a standalone `.mmd`
+headed for export actually ships one. The check is now scoped to `.mmd` files,
+and the clean count went from 12 to 19.
+
+### Before
+
+A real shape, and the most common one — every node a rectangle, every arrow
+silent, nothing emphasised:
+
+```mermaid
+flowchart TD
+    A[Client] --> B[Gateway]
+    B --> C[Auth Service]
+    C --> D[User Service]
+    D --> E[Database]
+    B --> F[Order Service]
+    F --> E
+    F --> G[Payment Service]
+    G --> H[External API]
+    F --> I[Notification Service]
+    I --> J[Email Provider]
+    E --> K[Backup]
+```
+
+```
+$ marmalade_slop.py before.mmd
+
+before.mmd — 70/100 (acceptable), 11 nodes / 11 edges, budget 12
+  ! SLOP004  Only 0 of 11 edges say what they mean.
+      → An unlabeled arrow asserts 'related somehow'. Label the verb —
+        'publishes', 'reads from', 'falls back to' — or drop the edge.
+  ! SLOP005  Every node is the same shape.
+      → Shape is free encoding. Give stores a cylinder, decisions a diamond,
+        external systems a stadium — then the reader parses the diagram
+        before reading a word.
+  ! SLOP007  Nothing in the diagram is emphasized.
+      → A diagram with no focal point makes the reader do the ranking.
+  · SLOP012  Diagram carries no theme or title metadata.
+```
+
+### After
+
+Same system, one question — *how does an order get submitted?* Six nodes instead
+of eleven, because the auth, notification, and backup paths are different
+diagrams:
+
+```mermaid
+---
+title: Order submission path
+---
+flowchart LR
+    accTitle: Order submission path
+    accDescr: A submitted order is authorized at the gateway, then the order
+      service writes it to Postgres and charges Stripe. A failed charge returns
+      the order to the retry queue.
+
+    Client([Storefront]) -->|POST /orders| GW[API gateway]
+    GW -->|validates session| Orders[Order service]
+    Orders -->|writes order| DB[(Postgres)]
+    Orders -->|charges| Stripe([Stripe API])
+    Stripe -->|declined| Retry[(Retry queue)]
+    Retry -->|once, after 5 min| Orders
+
+    classDef focal    fill:#dbeaf5,stroke:#0072B2,stroke-width:2px,color:#062033
+    classDef external fill:#ffffff,stroke:#767676,stroke-width:1px,stroke-dasharray:4 3,color:#3b414d
+    class Orders focal
+    class Client,Stripe external
+```
+
+```
+$ marmalade_slop.py after.mmd
+
+after.mmd — 100/100 (clean), 6 nodes / 6 edges, budget 12
+  (no findings)
+```
+
+Nothing was made prettier. The edges gained verbs, the shapes gained meaning,
+one node was marked as the point, and five nodes that belonged to other
+questions were deleted.
+
+
 ## Commands
 
 | | |

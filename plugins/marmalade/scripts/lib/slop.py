@@ -295,7 +295,17 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
         )
 
     # --- SLOP012: default styling, shipped -----------------------------------
-    if not parsed.has_frontmatter and not fills and not parsed.has_init_directive and len(nodes) >= 5:
+    # Only meaningful for a standalone .mmd, which gets exported through
+    # mermaid-cli and really does ship the default look. A fenced block inherits
+    # the docs platform's theme, so penalising it there is noise: measured against
+    # 39 real diagrams, this fired on 35 and carried no information.
+    if (
+        block.origin == "file"
+        and not parsed.has_frontmatter
+        and not fills
+        and not parsed.has_init_directive
+        and len(nodes) >= 5
+    ):
         findings.append(
             Finding(
                 line=header,

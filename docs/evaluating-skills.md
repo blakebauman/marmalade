@@ -131,6 +131,27 @@ baseline emitted a single Markdown fence. The assertions were simply ones both
 arms pass. That case needs harder criteria — which is exactly what the eval is
 for.
 
-The improvement loop: run it, find the assertions that pass in both arms, replace
-them with ones that discriminate, and re-run. Drop assertions that pass in both;
-investigate ones that fail in both.
+### The improvement loop
+
+The runner keeps every criterion's verdict individually, not just the aggregate,
+and prints the ones that failed to separate the arms:
+
+```
+Criteria that do not discriminate:
+
+  authoring-type-choice
+    passes in both  It carries accTitle and accDescr
+    fails in both   The 14-day and 30-day conditions appear on the edges
+```
+
+An aggregate score cannot tell you *which* assertion is inert, which is why the
+per-criterion verdicts are worth the space in `report.json`.
+
+- **Passes in both** — the criterion is not measuring the plugin. Replace it with
+  something anchored to what Marmalade's method uniquely produces, or drop it.
+- **Fails in both** — either the criterion is unreasonable, or it is describing
+  something the skill does not actually do. Both are worth knowing; the second is
+  a bug report against the skill, not the eval.
+
+Run at `--runs 1` first to find the inert criteria cheaply, then at `--runs 3`
+once they are sharpened, because only repeats give you the spread.

@@ -150,17 +150,22 @@ Return ONLY a JSON object, no prose, of the form:
 One entry per criterion, in order."""
 
 
-def run_llm_grader(grader, output: str) -> tuple:
+def run_llm_grader(grader, output: str) -> list:
+    """Return one verdict per criterion. Keeping them individually is what makes
+    the improvement loop possible: an aggregate score cannot tell you *which*
+    assertion passes in both arms and therefore measures nothing."""
     prompt = JUDGE.format(criteria=grader["body"], output=output[:60000])
     res = claude(prompt, cwd=Path(tempfile.gettempdir()), plugin=False, timeout=300)
     m = re.search(r"\{.*\}", res["text"], re.S)
     if not m:
-        return 0, 0
+        return []
     try:
         verdicts = json.loads(m.group(0))["verdicts"]
     except Exception:
-        return 0, 0
-    return sum(1 for v in verdicts if v.get("passed")), len(verdicts)
+        return []
+    return [{"grader": grader["name"], "index": i,
+             "criterion": str(v.get("criterion", ""))[:120],
+             "passed": bool(v.get("passed"))} for i, v in enumerate(verdicts)]
 
 
 def collect_output(run_dir: Path, transcript: str) -> str:
@@ -172,18 +177,20 @@ def collect_output(run_dir: Path, transcript: str) -> str:
     return "\n".join(parts)
 
 
-def score_run(case: Case, run_dir: Path, transcript: str) -> float:
-    passed = total = 0
+def score_run(case: Case, run_dir: Path, transcript: str) -> tuple:
+    """Returns (score, verdicts) — verdicts are per-criterion, not aggregated."""
+    verdicts = []
     output = collect_output(run_dir, transcript)
     for g in case.graders:
         if g["meta"].get("type") == "script":
-            total += 1
-            passed += 1 if run_script_grader(g, run_dir) else 0
+            verdicts.append({"grader": g["name"], "index": 0,
+                             "criterion": f"[script] {g['name']}",
+                             "passed": run_script_grader(g, run_dir)})
         else:
-            p, t = run_llm_grader(g, output)
-            passed += p
-            total += t
-    return passed / total if total else 0.0
+            verdicts += run_llm_grader(g, output)
+    if not verdicts:
+        return 0.0, []
+    return sum(1 for v in verdicts if v["passed"]) / len(verdicts), verdicts
 
 
 def main() -> int:
@@ -226,7 +233,7 @@ def main() -> int:
         n = args.runs or case.runs
         row = {"case": case.name, "runs": n, "arms": {}}
         for arm in ARMS:
-            scores, seconds = [], []
+            scores, seconds, all_verdicts = [], [], []
             for i in range(1, n + 1):
                 run_dir = out_root / case.name / arm / f"run-{i}"
                 run_dir.mkdir(parents=True, exist_ok=True)
@@ -242,7 +249,8 @@ def main() -> int:
                     shutil.rmtree(work, ignore_errors=True)
                     continue
                 (work / "transcript.txt").write_text(res["text"])
-                s = score_run(case, work, res["text"])
+                s, verdicts = score_run(case, work, res["text"])
+                all_verdicts.append(verdicts)
                 shutil.copytree(work, run_dir, dirs_exist_ok=True)
                 shutil.rmtree(work, ignore_errors=True)
                 scores.append(s)
@@ -256,6 +264,7 @@ def main() -> int:
                 "stddev": round(statistics.stdev(scores), 3) if len(scores) > 1 else 0.0,
                 "seconds_mean": round(statistics.mean(seconds), 1) if seconds else None,
                 "completed": len(scores),
+                "verdicts": all_verdicts,
             }
         a, b = row["arms"]["with_plugin"]["mean"], row["arms"]["without_plugin"]["mean"]
         row["delta"] = round(a - b, 3) if a is not None and b is not None else None
@@ -273,6 +282,41 @@ def main() -> int:
         print(f"{r['case']:26s} {fmt(w['mean']):>6s} {fmt(o['mean']):>8s} "
               f"{fmt(r['delta']):>7s} {spread:>7.2f}{flag}")
     print(f"\nFull report: {out_root / 'report.json'}")
+
+    # The improvement loop lives here. A criterion that passes in both arms is
+    # not measuring the plugin; one that fails in both is either too hard or
+    # testing something the skill does not actually do.
+    print("\nCriteria that do not discriminate:")
+    any_flagged = False
+    for r in report["cases"]:
+        def rate(arm, key):
+            vs = [v["passed"] for runs in r["arms"][arm]["verdicts"] for v in runs
+                  if (v["grader"], v["index"]) == key]
+            return sum(vs) / len(vs) if vs else None
+
+        keys, text = [], {}
+        for runs in r["arms"]["with_plugin"]["verdicts"]:
+            for v in runs:
+                k = (v["grader"], v["index"])
+                if k not in text:
+                    keys.append(k)
+                    text[k] = v["criterion"]
+        flagged = []
+        for k in keys:
+            w, o = rate("with_plugin", k), rate("without_plugin", k)
+            if w is None or o is None:
+                continue
+            if w == 1.0 and o == 1.0:
+                flagged.append(("passes in both", text[k]))
+            elif w == 0.0 and o == 0.0:
+                flagged.append(("fails in both ", text[k]))
+        if flagged:
+            any_flagged = True
+            print(f"\n  {r['case']}")
+            for why, t in flagged:
+                print(f"    {why}  {t}")
+    if not any_flagged:
+        print("  none — every criterion separated the arms at least once.")
     return 0
 
 

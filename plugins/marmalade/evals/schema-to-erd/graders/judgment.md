@@ -3,19 +3,24 @@ type: llm
 ---
 Grade the response against these criteria. Each is independently pass/fail.
 
-- Cardinality is **read from the constraints, not guessed**. `users.tenant_id` is
-  `NOT NULL REFERENCES tenants(id)`, so tenants-to-users is one-to-many with a
-  mandatory parent (`||--o{`); `projects.owner_id` is nullable, so that side is
-  optional (`|o`). A response that marks every relationship `||--o{` fails this.
-- **`project_members` is recognised as a join table** with a composite primary
-  key, and the diagram says so — either by modelling it as the associative entity
-  it is, or by rendering projects-to-users as many-to-many and naming
-  `project_members` as the join. Silently drawing it as a third ordinary entity
-  with two unexplained edges fails.
-- The **self-referencing `manager_id`** edge on `users` is present. Dropping it is
-  the most common omission and this criterion exists to catch it.
-- Relationship edges carry **verbs** ("employs", "owns", "belongs to"), not bare
-  connectors.
-- The response does not invent tables, columns, or constraints that are absent
-  from the SQL.
-- It carries `accTitle` and `accDescr`.
+An unaided model reads the constraints correctly and renders the join table, so
+those are no longer worth asking. These test what Marmalade's method adds.
+
+- **The response reviews the schema, not just draws it.** It surfaces at least
+  one substantive finding the diagram makes visible — for example that
+  `projects.owner_id` is nullable and `ON DELETE` is unspecified, so ownership can
+  dangle; or that `project_members` has no index beyond its composite PK.
+- **It names the cross-tenant integrity gap**: `projects` and `users` each carry
+  their own `tenant_id`, and nothing in the schema stops a `project_members` row
+  joining a user in one tenant to a project in another. This is the finding an
+  ERD is uniquely good at exposing and a naive rendering misses.
+- **`tenants` is identified as the root of the tenancy tree**, and the response
+  says what that implies — every query path should be tenant-scoped.
+- **The response distinguishes what the SQL states from what it infers.** Where it
+  suggests intent (a nullable owner means projects outlive their owner), it marks
+  that as inference rather than asserting it as schema fact.
+- **It does not pad the ERD with attributes.** Four tables is inside any budget,
+  but the response should still be selective about which columns earn a row —
+  keys and the columns that carry meaning, not every varchar.
+- **`accTitle` and `accDescr` are present, and `accDescr` conveys the actual
+  relationships** rather than saying "an entity relationship diagram".

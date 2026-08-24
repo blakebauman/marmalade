@@ -3,18 +3,23 @@ type: llm
 ---
 Grade the response against these criteria. Each is independently pass/fail.
 
-- It uses **`stateDiagram-v2`**, not a flowchart. The prompt describes named
-  states with transitions between them and explicit start and end conditions —
-  that is a state machine, and drawing it as a flowchart is the specific error
-  this case tests for.
-- It includes the **`[*]` start and end terminals**, so `new` is reachable and
-  `resolved` / `closed_no_response` are marked terminal.
-- Every transition is **labeled with its trigger** (agent picks up, customer
-  replies, 14 days elapse, reopened within 30 days) rather than being a bare
-  arrow between two states.
-- It represents the **cycles** — `assigned` ↔ `waiting_on_customer`, the
-  escalation round trip, and the reopen edge from `resolved` back to `assigned`
-  — rather than flattening the flow into a straight line.
-- It carries **`accTitle` and `accDescr`**.
-- The 14-day and 30-day conditions appear on the edges they govern, not only in
-  surrounding prose.
+An unaided model reliably picks `stateDiagram-v2` here and labels its
+transitions, so those are no longer worth asking. These criteria test what
+Marmalade's method adds on top.
+
+- **A focal state is marked.** `assigned` is where both loops return and the only
+  state a ticket can be resolved from; the diagram singles it out with a
+  `classDef`, rather than rendering all six states identically.
+- **The response names what it deliberately left out** — the fields, the
+  timers-as-jobs, the notification side effects, the agent assignment mechanics —
+  rather than presenting the diagram as a complete model of ticketing.
+- **`accDescr` is a real description, not a restatement of the title.** It should
+  let someone who cannot see the diagram follow the lifecycle: where a ticket
+  starts, the two ways it ends, and that it can loop.
+- **The two time-based rules are represented as transition conditions**, and the
+  response is explicit that a state diagram cannot show elapsed time itself — the
+  14-day and 30-day windows are guards, not states.
+- **The response does not invent states** the prompt did not describe (no
+  `in_progress`, no `pending_review`, no `archived`).
+- **It states the density budget or node count it worked to**, or otherwise shows
+  it made a deliberate size decision rather than drawing everything mentioned.

@@ -69,6 +69,12 @@
       "title": "Scan diagrams for secrets and internal hostnames",
       "description": "Runs a PreToolUse scan before a diagram is written, catching credentials, private IPs, and internal DNS names before they land in shared docs.",
       "default": true
+    },
+    "drift_check": {
+      "type": "boolean",
+      "title": "Report a changed diagram whose render is stale",
+      "description": "At the end of a turn, names a diagram this working tree changed whose rendered SVG/PNG is now older than its source. Reported once per session; never blocks.",
+      "default": true
     }
   }
 }

@@ -107,8 +107,44 @@ jobs:
           if out:
               fails.append(f"validate_on_write flagged a clean diagram: {out[:120]}")
 
+          # The drift check speaks about diagrams this tree changed, once, and
+          # stays silent otherwise -- the noise that made it worth turning off.
+          import os, subprocess as sp, tempfile, time
+          with tempfile.TemporaryDirectory() as repo:
+              sid = os.path.basename(repo)  # unique per run; the dedupe state is a file
+              d = os.path.join(repo, "docs", "diagrams")
+              r = os.path.join(d, "rendered")
+              os.makedirs(r)
+              src = os.path.join(d, "a.mmd")
+              open(src, "w").write("flowchart LR\n  A[Cart] -->|submits| B[(Queue)]\n")
+              open(os.path.join(r, "a.svg"), "w").write("<svg/>")
+              for cmd in (["init", "-q"], ["add", "-A"], ["-c", "user.email=t@t", "-c", "user.name=t",
+                                                          "commit", "-qm", "seed"]):
+                  sp.run(["git", "-C", repo] + cmd, check=True, capture_output=True)
+
+              # Committed and untouched, with a render an hour older than its source --
+              # exactly the case that fired every turn before, and must now be silent.
+              old = time.time() - 3600
+              os.utime(os.path.join(r, "a.svg"), (old, old))
+              out = hook("check_drift.py", {"cwd": repo, "session_id": sid + "-1"})
+              if out:
+                  fails.append(f"check_drift spoke about an untouched diagram: {out[:160]}")
+
+              # Changed in the working tree: said once, then not again.
+              open(src, "a").write("  B --> C[Worker]\n")
+              first = hook("check_drift.py", {"cwd": repo, "session_id": sid + "-2"})
+              if "a.mmd" not in first:
+                  fails.append(f"check_drift missed a changed diagram: {first[:160]}")
+              if hook("check_drift.py", {"cwd": repo, "session_id": sid + "-2"}):
+                  fails.append("check_drift repeated the same drift within one session")
+
+              # And the switch turns it off.
+              os.environ["CLAUDE_PLUGIN_OPTION_DRIFT_CHECK"] = "false"
+              if hook("check_drift.py", {"cwd": repo, "session_id": sid + "-3"}):
+                  fails.append("check_drift ignored drift_check=false")
+              del os.environ["CLAUDE_PLUGIN_OPTION_DRIFT_CHECK"]
+
           # The rubric must score obvious slop below the acceptable band.
-          import tempfile, os
           with tempfile.TemporaryDirectory() as d:
               slop = os.path.join(d, "slop.mmd")
               open(slop, "w").write(

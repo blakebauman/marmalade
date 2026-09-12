@@ -201,8 +201,9 @@ Four, so the standard holds without anyone remembering it:
   on syntax errors so a broken diagram is fixed in the same turn.
 - **SessionStart** — reports the repo's Mermaid setup, and stays silent in repos
   that have none.
-- **Stop** — reports diagrams whose rendered artifacts have drifted from their
-  source. Never blocks.
+- **Stop** — reports a diagram *this working tree changed* whose rendered artifact
+  is now older than its source. Once per session, never blocks, and silent in a
+  tree nobody is editing diagrams in.
 
 ## The toolchain
 
@@ -255,6 +256,7 @@ Set at install through `/plugin`:
 | `export_formats` | `svg` | Formats a plain export produces |
 | `strict_validation` | `true` | Block writes that fail Mermaid validation |
 | `secret_scan` | `true` | Scan diagrams for credentials before writing |
+| `drift_check` | `true` | Report a changed diagram whose render is stale, at end of turn |
 
 ## Requirements
 

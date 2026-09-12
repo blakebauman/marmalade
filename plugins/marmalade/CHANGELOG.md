@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- **The drift check speaks only about diagrams this working tree changed, once per
+  session.** It compared every source under `diagram_dir` on every turn, so a repo
+  that renders a subset of its diagrams — the normal case — got the same paragraph
+  after every turn forever, in sessions that never opened a diagram. Modified or
+  untracked in git is how it now decides someone is working on a file, which holds
+  whether the edit came from a tool call, a `sed` in a shell, or an editor in
+  another window. Outside a git tree it still compares mtimes but no longer reports
+  sources that were never rendered — there it cannot tell a new diagram from one
+  the repo deliberately never exports.
+- **New `drift_check` setting** (`MARMALADE_DRIFT_CHECK`, default on) turns that
+  hook off for anyone who wants export to be a purely manual step.
+
 ## 0.1.5
 
 - **Fixed: `marmalade_export.py` crashed on every run.** The config refactor in

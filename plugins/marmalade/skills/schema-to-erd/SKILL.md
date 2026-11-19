@@ -28,7 +28,8 @@ This is the part hand-drawn ERDs get wrong. The generator reads the catalog:
 | :-- | :-- |
 | FK column is `NOT NULL` | `\|\|` on the parent side — exactly one |
 | FK column is nullable | `\|o` on the parent side — zero or one |
-| FK column is also `UNIQUE` or the PK | `\|\|` on the child side — one-to-one |
+| FK columns are, together, a whole `UNIQUE` or primary key | `\|\|` on the child side — one-to-one |
+| FK column is only part of a composite key (a join table) | `o{` on the child side — still many |
 | Plain FK | `o{` on the child side — zero or more |
 
 So a nullable, non-unique FK renders `PARENT |o--o{ CHILD`, and a PK-that-is-also-FK

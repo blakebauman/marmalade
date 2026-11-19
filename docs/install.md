@@ -54,6 +54,7 @@ two hook toggles. Every setting can also be overridden per-shell:
 export MARMALADE_DIAGRAM_DIR=docs/architecture
 export MARMALADE_EXPORT_DIR=docs/architecture/rendered
 export MARMALADE_THEME=dark
+export MARMALADE_DETAIL=faithful
 ```
 
 Precedence is `explicit CLI flag > MARMALADE_* > /plugin userConfig > default`.
@@ -122,7 +123,7 @@ folder to another host and the folder arrives, but:
   import-graph generators are all unreachable.
 - The 4 hooks (secret scan before write, validation after write, drift check on
   stop, session context) are Claude Code only.
-- The 8 slash commands and 12 subagents are Claude Code only.
+- The 9 slash commands and 12 subagents are Claude Code only.
 - The theme presets and templates live under `assets/`, outside the skill folder.
 
 What you keep is the **judgment**: the no-slop rubric, the density budgets, the

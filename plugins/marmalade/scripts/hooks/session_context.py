@@ -16,7 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _hookio import emit, option, read_event  # noqa: E402
 
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
+from fswalk import iter_files  # noqa: E402
+
 DOC_EXT = (".md", ".markdown", ".mdx", ".qmd")
 CONFIG_NAMES = (
     ".mermaidrc", ".mermaidrc.json", "mermaid.config.json",
@@ -26,15 +27,7 @@ MAX_WALK = 4000
 
 
 def walk(root: Path):
-    seen = 0
-    for path in root.rglob("*"):
-        if seen > MAX_WALK:
-            return
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        if path.is_file():
-            seen += 1
-            yield path
+    return iter_files(root, limit=MAX_WALK)
 
 
 def main() -> int:

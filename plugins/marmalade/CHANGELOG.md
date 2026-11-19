@@ -1,5 +1,72 @@
 # Changelog
 
+## Unreleased
+
+An audit of the toolchain. Every item was reproduced before it was fixed, and
+the reproductions are now CI cases.
+
+- **Fixed: the linter rejected valid Mermaid**, which with `strict_validation`
+  on blocked the write. An apostrophe in a label (`A[User's cart]`), the
+  asymmetric node (`A>text]`), a `block:id … end` group in a block diagram, a
+  `%%` inside a quoted label, and the `flowchart-elk` header all reported
+  errors. A diagram type the linter does not know is now a warning (`MMD003`),
+  not an error, since Mermaid adds types faster than the list is updated.
+- **Fixed: fenced blocks.** A `mermaid` fence quoted inside a longer fence — a
+  Markdown example — was linted as a real diagram. Quarto's `{mermaid}` fence
+  was not recognized at all, so `.qmd` diagrams were never linted, scanned, or
+  exported.
+- **Fixed: an edit was blocked over another diagram's error.** The PostToolUse
+  hook linted every block in an edited Markdown file. Errors in blocks the edit
+  did not touch are now reported as a notice.
+- **Fixed: the secret scanner denied ordinary labels.** `.env.local` and
+  `settings.local.json` matched as internal hostnames, and a class attribute
+  such as `+password: PasswordHash` matched as a credential.
+- **Fixed: the secret scanner missed real leaks.** An `Edit` to a line inside a
+  Markdown fence went unscanned when the fragment held no diagram keyword; the
+  hook now applies the edit to the file on disk to see whether it lands in a
+  diagram. IPv6 unique local addresses and `sk-…` API keys are now caught.
+- **Fixed: `pg_erd.py` cardinality.** A foreign key column that was one part of
+  a composite key was drawn one-to-one, so every join table was wrong. A
+  table-level `FOREIGN KEY` was always drawn optional. A column whose name began
+  with `unique` was dropped. Keys declared by `ALTER TABLE … ADD CONSTRAINT`,
+  which is how `pg_dump` writes them all, were ignored. Composite foreign keys
+  are now read.
+- **Fixed: a read-only role produced an ERD with no keys.** Live introspection
+  read `information_schema` constraint views, which hide constraints from a
+  role with only `SELECT`. It now reads `pg_catalog`.
+- **`pg_erd.py` no longer puts the password on the `psql` command line**, and
+  `--schema` is quoted as a literal.
+- **Fixed: `py_diagram.py` collapsed a package to one node** with no edges, and
+  found no edges at all in a tree of scripts that import each other through
+  `sys.path`. `--package-depth` now counts levels below the scanned directory.
+- **Fixed: `docs_sync.py` called exported Markdown fences orphans** and told
+  you to delete them. It now uses the exporter's own job list, so it agrees with
+  `marmalade_export.py --check`.
+- **Fixed: the Stop hook contradicted the manifest.** It compared modification
+  times, so a fresh clone reported every render as stale. It now compares
+  content hashes when a manifest exists, and reports a finding once per session
+  instead of at the end of every turn.
+- **Fixed: rubric checks that fired backwards.** `SLOP005` counted the `>` of
+  `-->` as a shape, hiding uniform diagrams and flagging varied ones. `SLOP009`
+  flagged a branch as a chain and missed a chain written on one line. `SLOP001`
+  counted a 20-class diagram as zero nodes. `SLOP003` matched hedge words inside
+  other words ("Awesome").
+- **Fixed: a repository under a directory named `build`, `dist`, `target` or
+  `venv` looked empty** to every script. Skip directories are now matched below
+  the directory being walked, and are pruned rather than walked and discarded.
+- **Export notices changed render options.** A render is stale when the theme
+  file's contents, `--scale`, `--width`, `--background` or `--css` change, not
+  only when the source does. Existing manifests are not invalidated.
+- **`default_theme` documented `brand`, which is not a preset**, and omitted
+  `colorblind-safe`. A new `detail` option sets the default density budget.
+- **`check_contrast.py` fails when it has nothing to check** instead of
+  reporting that all 0 pairs pass.
+- **`/marmalade:status`** no longer advertises arguments it ignored, and
+  **`/marmalade:sync`** no longer fails when run with none.
+- **`release.yml` runs the full CI suite** before building the artifact.
+- **CI runs on Python 3.9 and 3.14** — the oldest supported interpreter and
+  the newest.
+
 ## 0.1.5
 
 - **Fixed: `marmalade_export.py` crashed on every run.** The config refactor in

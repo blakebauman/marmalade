@@ -47,7 +47,7 @@ The plugin is **nested**, not at the repo root:
   `TOKEN_*` placeholders.
 - **`PRESETS` in `marmalade_export.py` matches `assets/themes/*.json`.**
 - **Stdlib only.** The scripts have no third-party dependencies and CI runs them
-  on Python 3.9 with no pip step. Keep it that way — including in `scripts/`.
+  on Python 3.9 and 3.14 with no pip step. Keep it that way — including in `scripts/`.
 - **`README.md` and `plugins/marmalade/README.md` are byte-identical**, as are the
   two `LICENSE` files. Edit both, or the validator fails.
 

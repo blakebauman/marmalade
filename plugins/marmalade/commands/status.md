@@ -1,24 +1,24 @@
 ---
 description: Report the state of this project's diagrams — inventory, drift, scores, and what to fix next.
-argument-hint: "[diagram dir] [--docs root]"
 allowed-tools: Bash, Read, Glob
 ---
 
 ## Inventory and drift
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/docs_sync.py" --json 2>&1 | head -80`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/docs_sync.py" --json 2>&1 | head -400`
 
 ## Rubric scores
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/marmalade_slop.py" --json 2>&1 | head -120`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/marmalade_slop.py" --json 2>&1 | head -600`
 
 ## Lint findings
 
-!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/marmalade_lint.py" --json 2>&1 | head -80`
+!`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/marmalade_lint.py" --json 2>&1 | head -400`
 
 ## Your task
 
-This is a **read-only status pass**. Do not fix anything, do not render anything,
+The three reports cover the configured diagram and export directories; this
+command takes no arguments. This is a **read-only status pass**. Do not fix anything, do not render anything,
 and do not write a diagram. Report, then stop.
 
 Read the three reports above and give the user a short, scannable picture:
@@ -41,6 +41,9 @@ Read the three reports above and give the user a short, scannable picture:
 
 If the diagram directory does not exist or holds no sources, say that plainly and
 point at `/marmalade:draw` to author the first one — do not report empty tables.
+
+Each report is cut off after a few hundred lines. If one ends mid-object, say
+that the picture is partial and name the script to run for the full output.
 
 If a report failed to run rather than returning empty results, say which one and
 what the error was; do not silently present partial state as complete. For an

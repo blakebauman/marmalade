@@ -13,7 +13,7 @@ plugins/marmalade/                  everything that ships
   .claude-plugin/plugin.json        the manifest, including the userConfig schema
   agents/*.md                       12 subagents
   skills/<name>/SKILL.md            10 skills; long material in <name>/reference/
-  commands/*.md                     8 slash commands
+  commands/*.md                     9 slash commands
   hooks/hooks.json                  4 hooks -> scripts/hooks/*.py
   scripts/                          the Python toolchain
     lib/                            shared: mermaid_lint, slop, config
@@ -79,7 +79,7 @@ ignored by export, slop, lint and sync.
 **Toolchain**
 
 - **Stdlib only**, Python 3.9 compatible. No third-party dependencies anywhere,
-  including `scripts/`. CI runs on 3.9 with no pip step.
+  including `scripts/`. CI runs on 3.9 and 3.14 with no pip step.
 - Anything shared between two scripts belongs in `scripts/lib/`.
 
 **Assets**

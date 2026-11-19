@@ -15,7 +15,7 @@ Checks the invariants that break installs silently:
 - the duplicated README and LICENSE pairs are still identical
 
 Usage: python3 scripts/validate.py   (exit 0 = ok, 1 = errors)
-Stdlib only - CI runs this on python 3.9 with no pip step.
+Stdlib only - CI runs this on python 3.9 and 3.14 with no pip step.
 """
 from __future__ import annotations
 

@@ -3,6 +3,7 @@ __pycache__/
 .DS_Store
 
 # Built by .github/workflows/release.yml; generated, not source.
+marmalade.zip
 *.plugin
 
 # Eval run outputs. The case files under plugins/marmalade/evals/ ARE source.

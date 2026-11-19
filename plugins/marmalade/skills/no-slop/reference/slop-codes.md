@@ -12,7 +12,9 @@ Score starts at 100. Each finding costs 18 (error), 9 (warning), or 3 (info).
 ## SLOP001 — over the density budget
 
 **Triggers** when node count exceeds the detail budget (7 / 12 / 24). Escalates
-from warning to error past 1.5× the budget.
+from warning to error past 1.5× the budget. What counts as a node follows the
+diagram type: flowchart and state nodes, sequence participants, classes, and ER
+entities.
 
 **Why it matters.** Past roughly a dozen labeled things a reader stops tracing
 paths and starts skimming, which is the same as not reading the diagram.
@@ -56,7 +58,8 @@ common. `Payment providers` beats `Various services`.
 **Triggers** when fewer than a third of edges carry a label, and there are at
 least four edges. Diagram-type aware: flowcharts want `|label|` or
 `-- text -->`, sequence and state diagrams want `: text`, ER diagrams want
-`: "text"`. Families with no edge-label grammar are skipped.
+`: "text"`. Class inheritance and realization arrows are not counted, since they
+need no label. Families with no edge-label grammar are skipped.
 
 **Why it matters.** An unlabeled arrow asserts "related somehow". That is rarely
 the claim worth drawing, and it hides whether the relationship is a call, a
@@ -70,7 +73,8 @@ dependency, a data flow, or a fallback.
 ## SLOP005 — one shape for everything
 
 **Triggers** on flowcharts and block diagrams with 6+ nodes that use a single
-node shape.
+node shape. Shapes are read from the node definitions, wherever they appear —
+on their own line or inline on an edge.
 
 **Why it matters.** Shape is free encoding that survives greyscale printing and
 color blindness. Discarding it makes the reader read every label to learn what
@@ -121,7 +125,9 @@ reader. They read as decoration standing in for encoding.
 
 ## SLOP009 — straight chain (info)
 
-**Triggers** on a flowchart of 2–4 nodes and ≤3 edges with no branching.
+**Triggers** on a flowchart of 2–4 nodes that form one unbranched, acyclic path,
+whether it is written as `A --> B --> C` on one line or one edge per line. A
+node with two ways out or two ways in is a branch and does not trigger it.
 
 **Why it matters.** `A → B → C` is a sentence rendered as an image: slower to
 read, impossible to search, and it breaks in the terminal.

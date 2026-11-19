@@ -16,11 +16,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import config  # noqa: E402
+from fswalk import sorted_files  # noqa: E402
 from mermaid_lint import extract_blocks  # noqa: E402
 from slop import BUDGETS, DEFAULT_DETAIL, check  # noqa: E402
 
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 ICON = {"error": "✗", "warning": "!", "info": "·"}
 
 
@@ -31,11 +31,7 @@ def collect(roots: list[str]) -> list[Path]:
         if p.is_file():
             files.append(p)
         elif p.is_dir():
-            for child in sorted(p.rglob("*")):
-                if any(part in SKIP_DIRS for part in child.parts):
-                    continue
-                if child.is_file() and child.suffix.lower() in SCANNABLE:
-                    files.append(child)
+            files.extend(sorted_files(p, SCANNABLE))
     return files
 
 
@@ -58,6 +54,8 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="Emit machine-readable results.")
     ap.add_argument("--quiet", action="store_true", help="Only print diagrams that fall below --min-score.")
     args = ap.parse_args()
+    if args.detail not in BUDGETS:  # argparse does not validate a default
+        args.detail = DEFAULT_DETAIL
 
     roots = args.paths or [config.diagram_dir()]
     results = []

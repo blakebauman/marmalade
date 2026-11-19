@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 # so `stateDiagram-v2` wins over `stateDiagram`.
 DIAGRAM_TYPES = {
     "flowchart": "flowchart",
+    "flowchart-elk": "flowchart",
     "graph": "flowchart",
     "sequenceDiagram": "sequence",
     "classDiagram-v2": "class",
@@ -35,14 +36,20 @@ DIAGRAM_TYPES = {
     "timeline": "timeline",
     "zenuml": "zenuml",
     "sankey-beta": "sankey",
+    "sankey": "sankey",
     "xychart-beta": "xychart",
+    "xychart": "xychart",
     "block-beta": "block",
+    "block": "block",
     "packet-beta": "packet",
     "packet": "packet",
     "kanban": "kanban",
     "architecture-beta": "architecture",
+    "architecture": "architecture",
     "radar-beta": "radar",
+    "radar": "radar",
     "treemap-beta": "treemap",
+    "treemap": "treemap",
     "C4Context": "c4",
     "C4Container": "c4",
     "C4Component": "c4",
@@ -66,7 +73,15 @@ SHAPE_PAIRS = [
     (">", "]"), ("{{", "}}"), ("[", "]"), ("(", ")"), ("{", "}"),
 ]
 
-BLOCK_FENCE = re.compile(r"^(\s*)(`{3,}|~{3,})\s*mermaid\b([^\n]*)$", re.IGNORECASE)
+# Any fenced code block, whatever its language.
+ANY_FENCE = re.compile(r"^(\s*)(`{3,}|~{3,})(.*)$")
+# The info string of a Mermaid fence: ```mermaid, or Quarto's ```{mermaid}.
+MERMAID_INFO = re.compile(r"^\{?\s*mermaid\b(.*)$", re.IGNORECASE)
+# A header this linter does not know, but which is shaped like a diagram type
+# keyword. Mermaid adds diagram types faster than this list is updated.
+UNKNOWN_TYPE_SHAPE = re.compile(
+    r"^(?:[A-Za-z][A-Za-z0-9]*(?:Diagram|Chart|Graph)(?:-v\d+)?|[a-z][A-Za-z0-9]*-beta|C4[A-Z][A-Za-z]+)$"
+)
 INIT_DIRECTIVE = re.compile(r"%%\{\s*init\s*:")
 FRONTMATTER_FENCE = re.compile(r"^---\s*$")
 
@@ -126,18 +141,25 @@ def extract_blocks(path: str, text: str) -> list[Block]:
     lines = text.splitlines()
     i = 0
     while i < len(lines):
-        m = BLOCK_FENCE.match(lines[i])
+        m = ANY_FENCE.match(lines[i])
         if not m:
             i += 1
             continue
         fence = m.group(2)
-        info = (m.group(3) or "").strip()
+        mermaid = MERMAID_INFO.match(m.group(3).strip())
         closer = re.compile(r"^\s*" + fence[0] + "{" + str(len(fence)) + ",}\\s*$")
         j = i + 1
         body: list[str] = []
         while j < len(lines) and not closer.match(lines[j]):
             body.append(lines[j])
             j += 1
+        if mermaid is None:
+            # Some other language. Skip the whole fence, so a ```mermaid example
+            # quoted inside a longer ````markdown fence is not read as a diagram.
+            # An unterminated one is not a fence at all: carry on from the next line.
+            i = j + 1 if j < len(lines) else i + 1
+            continue
+        info = mermaid.group(1).strip().rstrip("}").strip()
         if j < len(lines):  # unterminated fences are the writer's problem, not ours
             blocks.append(
                 Block(
@@ -159,8 +181,13 @@ def _strip_comment(line: str) -> str:
     """Drop a trailing `%%` comment, but keep `%%{init:...}%%` directives."""
     if INIT_DIRECTIVE.search(line):
         return line
-    idx = line.find("%%")
-    return line if idx < 0 else line[:idx]
+    in_quote = False
+    for idx, ch in enumerate(line):
+        if ch == '"':
+            in_quote = not in_quote
+        elif ch == "%" and not in_quote and line.startswith("%%", idx):
+            return line[:idx]
+    return line
 
 
 def _parse(block: Block) -> _Parsed:
@@ -210,20 +237,24 @@ def _parse(block: Block) -> _Parsed:
 
 
 def _mask_labels(text: str) -> str:
-    """Blank out quoted strings so delimiter counting ignores label content."""
-    out, in_q, quote = [], False, ""
+    """Blank out quoted strings so delimiter counting ignores label content.
+
+    Only a double quote delimits a Mermaid label. An apostrophe is ordinary
+    text: `A[User's cart]` is one balanced node, not an unterminated string.
+    """
+    out, in_q = [], False
     for ch in text:
-        if in_q:
+        if ch == '"':
+            in_q = not in_q
             out.append(" ")
-            if ch == quote:
-                in_q, quote = False, ""
-            continue
-        if ch in ('"', "'"):
-            in_q, quote = True, ch
-            out.append(" ")
-            continue
-        out.append(ch)
+        else:
+            out.append(" " if in_q else ch)
     return "".join(out)
+
+
+# `A>Flagged order]` is Mermaid's asymmetric node: it opens with `>` and closes
+# with `]`, so it is balanced even though the brackets do not pair up.
+_ASYMMETRIC_NODE = re.compile(r"(?<![\w-])([A-Za-z_](?:[\w-]*\w)?)>([^\[\]]*)\]")
 
 
 def _check_header(block: Block, p: _Parsed) -> list[Finding]:
@@ -239,6 +270,19 @@ def _check_header(block: Block, p: _Parsed) -> list[Finding]:
         ):
             return f
         known = ", ".join(sorted({k for k in DIAGRAM_TYPES})[:8])
+        keyword = p.header_raw.split()[0].rstrip(":;") if p.header_raw.split() else ""
+        if UNKNOWN_TYPE_SHAPE.match(keyword):
+            f.append(
+                Finding(
+                    line=ln + p.header_line + 1,
+                    severity="warning",
+                    code="MMD003",
+                    message=f"{keyword!r} is not a diagram type this linter knows.",
+                    hint="If your Mermaid version supports it, ignore this; the body was not checked. "
+                         f"Otherwise use a known type ({known}, ...).",
+                )
+            )
+            return f
         f.append(
             Finding(
                 line=ln + p.header_line + 1,
@@ -289,10 +333,14 @@ _MULTILINE_BLOCK_TYPES = {"er", "class", "state", "requirement", "c4", "mindmap"
 
 def _check_delimiters(block: Block, p: _Parsed) -> list[Finding]:
     f: list[Finding] = []
+    if p.diagram_type is None:
+        return f  # no grammar to check against; the header check has already spoken
     ln = block.line_offset
     check_brackets = p.diagram_type not in _MULTILINE_BLOCK_TYPES
     for idx, text in p.body:
         masked = _mask_labels(text)
+        if p.diagram_type == "flowchart":
+            masked = _ASYMMETRIC_NODE.sub(lambda m: f"{m.group(1)}[{m.group(2)}]", masked)
         if text.count('"') % 2:
             f.append(
                 Finding(
@@ -326,9 +374,12 @@ def _check_subgraphs(block: Block, p: _Parsed) -> list[Finding]:
     f: list[Finding] = []
     ln = block.line_offset
     stack: list[int] = []
+    opener = "block" if p.diagram_type == "block" else "subgraph"
     for idx, text in p.body:
         head = text.split()[0] if text.split() else ""
-        if head == "subgraph":
+        # A block diagram groups with `block` / `block:id ... end`, not `subgraph`.
+        opens_block = p.diagram_type == "block" and (head == "block" or head.startswith("block:"))
+        if head == "subgraph" or opens_block:
             stack.append(idx)
         elif text == "end" or head == "end":
             if not stack:
@@ -337,8 +388,8 @@ def _check_subgraphs(block: Block, p: _Parsed) -> list[Finding]:
                         line=ln + idx + 1,
                         severity="error",
                         code="MMD020",
-                        message="`end` with no open `subgraph`.",
-                        hint="Remove it, or add the matching `subgraph` above.",
+                        message=f"`end` with no open `{opener}`.",
+                        hint=f"Remove it, or add the matching `{opener}` above.",
                     )
                 )
             else:
@@ -349,7 +400,7 @@ def _check_subgraphs(block: Block, p: _Parsed) -> list[Finding]:
                 line=ln + idx + 1,
                 severity="error",
                 code="MMD021",
-                message="`subgraph` is never closed.",
+                message=f"`{opener}` is never closed.",
                 hint="Add a matching `end` line.",
             )
         )

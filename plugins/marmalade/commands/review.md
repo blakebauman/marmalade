@@ -34,8 +34,8 @@ only the reviewers the diagram warrants, in parallel:
 A three-node state diagram does not need five reviewers. A system architecture
 diagram going into onboarding docs does.
 
-When the `impeccable` plugin is available, use `/impeccable critique` for
-anything customer-facing and fold its findings in rather than duplicating them.
+The `impeccable` plugin is installed alongside Marmalade as a dependency. Use
+`/impeccable critique` for anything customer-facing and fold its findings in rather than duplicating them.
 
 ## 3. Synthesize
 

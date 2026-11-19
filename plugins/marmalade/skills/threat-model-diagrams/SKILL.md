@@ -81,10 +81,11 @@ who were never going to read your config.
 The plugin scans every diagram write with a PreToolUse hook and blocks on:
 
 - Credentials — AWS keys, GitHub and Slack tokens, Stripe keys, Google API keys,
-  private key blocks, JWTs, `password=` assignments
+  `sk-…` API secret keys, private key blocks, JWTs, `password=` assignments
 - Connection strings carrying a password
 - Internal DNS names — `.internal`, `.corp`, `.local`, `.lan`, `.intranet`
-- Private IP addresses, excluding the RFC 5737 and RFC 3849 documentation ranges
+- Private IP addresses — RFC 1918 hosts and IPv6 unique local addresses —
+  excluding the RFC 5737 and RFC 3849 documentation ranges
 
 Turn it off with the `secret_scan` plugin option only if you have a specific
 reason.

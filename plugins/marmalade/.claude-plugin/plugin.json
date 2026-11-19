@@ -48,8 +48,14 @@
     "default_theme": {
       "type": "string",
       "title": "Default theme preset",
-      "description": "Bundled preset used when no theme is named: light, dark, high-contrast, print, or brand.",
+      "description": "Preset used when no theme is named: light, dark, high-contrast, colorblind-safe, or print. A path to your own Mermaid config JSON, such as a filled-in brand theme, also works.",
       "default": "light"
+    },
+    "detail": {
+      "type": "string",
+      "title": "Default density budget",
+      "description": "Node budget the rubric scores against when no --detail is given: simplified (7), balanced (12), or faithful (24).",
+      "default": "balanced"
     },
     "export_formats": {
       "type": "string",

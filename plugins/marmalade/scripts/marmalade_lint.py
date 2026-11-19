@@ -17,10 +17,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import config  # noqa: E402
+from fswalk import sorted_files  # noqa: E402
 from mermaid_lint import Finding, extract_blocks, lint  # noqa: E402
 
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 
 SEVERITY_ICON = {"error": "✗", "warning": "!", "info": "·"}
 
@@ -34,11 +34,7 @@ def iter_paths(roots: list[str]) -> list[Path]:
             continue
         if not p.is_dir():
             continue
-        for child in sorted(p.rglob("*")):
-            if any(part in SKIP_DIRS for part in child.parts):
-                continue
-            if child.is_file() and child.suffix.lower() in SCANNABLE:
-                found.append(child)
+        found.extend(sorted_files(p, SCANNABLE))
     return found
 
 

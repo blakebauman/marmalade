@@ -5,22 +5,29 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Called by release.yml, so a tag cannot ship without passing every gate here.
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
   verify:
-    name: verify
+    name: verify (python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest supported interpreter and the newest released one.
+        python: ["3.9", "3.14"]
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python }}
 
-      - name: Scripts compile on the oldest supported Python
+      - name: Scripts compile
         run: |
           python -m compileall -q \
             plugins/marmalade/scripts \
@@ -86,6 +93,12 @@ jobs:
               ("deny",  "leak inside a fence",   "d.md",  "# Doc\n\n```mermaid\nflowchart LR\n  A[10.4.2.17]\n```\n"),
               ("deny",  "AWS access key",        "a.mmd", "flowchart LR\n  A[AKIAIOSFODNN7EXAMPLE]\n"),
               ("deny",  "edit fragment",         "d.md",  "flowchart LR\n  A[db.corp.internal] --> B\n"),
+              ("allow", "dotfile, not a host",   "a.mmd", "flowchart LR\n  A[App] -->|reads| B[.env.local]\n"),
+              ("allow", "filename, not a host",  "a.mmd", "flowchart LR\n  A[CLI] --> B[settings.local.json]\n"),
+              ("allow", "attribute type",        "a.mmd", "classDiagram\n  class User {\n    +password: PasswordHash\n  }\n"),
+              ("deny",  "IPv6 unique local",     "a.mmd", "flowchart LR\n  A[fd12:3456:789a::1]\n"),
+              ("deny",  "sk- secret key",        "a.mmd", "flowchart LR\n  A[sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx]\n"),
+              ("deny",  "leak in a Quarto fence", "d.qmd", "# Doc\n\n```{mermaid}\nflowchart LR\n  A[10.4.2.17]\n```\n"),
           ]
           for want, label, path, content in CASES:
               out = hook("scan_secrets.py", {"tool_name": "Write",
@@ -107,8 +120,90 @@ jobs:
           if out:
               fails.append(f"validate_on_write flagged a clean diagram: {out[:120]}")
 
-          # The rubric must score obvious slop below the acceptable band.
           import tempfile, os
+
+          # An Edit to one line inside a Markdown fence carries no fence marker
+          # and no diagram keyword. It must still be scanned, and an edit to the
+          # prose beside the diagram must not be.
+          with tempfile.TemporaryDirectory() as d:
+              doc = os.path.join(d, "doc.md")
+              open(doc, "w").write("# Doc\n\nSome prose.\n\n```mermaid\nflowchart LR\n  A[api] --> DB[(db)]\n```\n")
+              leak = '  A[api] --> DB[("postgres://admin:hunter2secret@db/x")]'
+              out = hook("scan_secrets.py", {"tool_name": "Edit", "tool_input": {
+                  "file_path": doc, "old_string": "  A[api] --> DB[(db)]", "new_string": leak}})
+              if not out:
+                  fails.append("scan_secrets allowed a credential edited into a Markdown fence")
+              out = hook("scan_secrets.py", {"tool_name": "Edit", "tool_input": {
+                  "file_path": doc, "old_string": "Some prose.", "new_string": "Run " + leak.strip()}})
+              if out:
+                  fails.append("scan_secrets denied an edit to prose outside the diagram")
+
+          # Valid Mermaid must not block. Each of these did.
+          VALID = [
+              ("apostrophe in a label",   "a.mmd", "flowchart LR\n  A[User's cart] --> B[Checkout]\n"),
+              ("apostrophe in a message", "a.mmd", "sequenceDiagram\n  A->>B: fetch (user's orders)\n"),
+              ("asymmetric node",         "a.mmd", "flowchart LR\n  A>Flagged order] --> B[Review]\n"),
+              ("block diagram group",     "a.mmd", "block-beta\n  columns 2\n  block:grp\n    a b\n  end\n  c\n"),
+              ("%% inside a label",       "a.mmd", 'flowchart LR\n  A["50%% off (promo)"] --> B[Cart]\n'),
+              ("flowchart-elk header",    "a.mmd", "flowchart-elk TD\n  A --> B\n"),
+              ("unknown diagram type",    "a.mmd", "futureDiagram\n  anything (goes\n"),
+              ("quoted example fence",    "d.md",  "# Doc\n\n````markdown\n```mermaid\nflowchart XY\n  A -->\n```\n````\n"),
+          ]
+          for label, path, content in VALID:
+              out = hook("validate_on_write.py", {"tool_name": "Write", "tool_input": {
+                  "file_path": os.path.join(tempfile.gettempdir(), "marmalade-ci-" + path), "content": content}})
+              if '"decision": "block"' in out:
+                  fails.append(f"validate_on_write blocked valid Mermaid: {label}")
+
+          # A Quarto fence is a diagram, and a broken one must block.
+          out = hook("validate_on_write.py", {"tool_name": "Write", "tool_input": {
+              "file_path": "/tmp/x.qmd", "content": "# Doc\n\n```{mermaid}\nflowchart XY\n  A --> \n```\n"}})
+          if '"decision": "block"' not in out:
+              fails.append("validate_on_write did not lint a Quarto {mermaid} fence")
+
+          # An edit must not be blocked over an error in a diagram it did not touch.
+          with tempfile.TemporaryDirectory() as d:
+              doc = os.path.join(d, "two.md")
+              open(doc, "w").write(
+                  "```mermaid\nflowchart LR\n  A[Cart] --> B[Pay]\n```\n\n"
+                  "```mermaid\nflowchart XY\n  C --> \n```\n")
+              out = hook("validate_on_write.py", {"tool_name": "Edit", "tool_input": {
+                  "file_path": doc, "old_string": "x", "new_string": "  A[Cart] --> B[Pay]"}})
+              if '"decision": "block"' in out:
+                  fails.append("validate_on_write blocked an edit over an error in another diagram")
+              out = hook("validate_on_write.py", {"tool_name": "Edit", "tool_input": {
+                  "file_path": doc, "old_string": "x", "new_string": "  C --> "}})
+              if '"decision": "block"' not in out:
+                  fails.append("validate_on_write did not block an edit that broke its own diagram")
+
+          # Rubric checks, in the direction they are meant to fire.
+          sys.path.insert(0, "plugins/marmalade/scripts/lib")
+          import slop
+          from mermaid_lint import Block
+
+          def codes(src):
+              report = slop.check(Block(path="a.mmd", source=src))
+              return {f.code for f in report.findings}, report.node_count
+
+          head = "flowchart LR\n  accTitle: t\n  accDescr: d\n"
+          tail = "  classDef focal fill:#dbeaf5\n"
+          varied = head + "".join(f"  N{i}[Svc {i}] -->|asks| D{i}{{Ok {i}?}}\n" for i in range(4)) + tail
+          uniform = (head + "".join(f"  N{i}[Thing {i}]\n" for i in range(7))
+                     + "".join(f"  N{i} -->|calls| N{i+1}\n" for i in range(6)) + tail)
+          if "SLOP005" in codes(varied)[0]:
+              fails.append("SLOP005 fired on a diagram that mixes shapes")
+          if "SLOP005" not in codes(uniform)[0]:
+              fails.append("SLOP005 missed a diagram of identical shapes")
+          if "SLOP009" not in codes("flowchart LR\n  A[Cart] --> B[Pay] --> C[Ship]\n")[0]:
+              fails.append("SLOP009 missed a chain written on one line")
+          if "SLOP009" in codes("flowchart LR\n  A[Cart] --> B[Pay]\n  A --> C[Abandon]\n")[0]:
+              fails.append("SLOP009 called a branch a chain")
+          if "SLOP003" in codes("flowchart LR\n  A[Awesome API] -->|calls| B[Germany region]\n")[0]:
+              fails.append("SLOP003 matched a hedge word inside another word")
+          if codes("classDiagram\n" + "".join(f"  C{i} <|-- C{i+1}\n" for i in range(20)))[1] < 20:
+              fails.append("the rubric does not count classes as nodes")
+
+          # The rubric must score obvious slop below the acceptable band.
           with tempfile.TemporaryDirectory() as d:
               slop = os.path.join(d, "slop.mmd")
               open(slop, "w").write(
@@ -172,5 +267,75 @@ jobs:
           python plugins/marmalade/scripts/pg_erd.py --sql-file /tmp/schema.sql -o /tmp/erd.mmd
           python plugins/marmalade/scripts/marmalade_lint.py /tmp/erd.mmd --errors-only
 
+          # Cardinality is the generator's whole claim. A join table is
+          # many-to-one on both sides, whichever way its keys are declared; a
+          # foreign key that is the whole primary key is one-to-one.
+          cat > /tmp/join.sql <<'SQL'
+          CREATE TABLE orders (id int PRIMARY KEY);
+          CREATE TABLE products (id int PRIMARY KEY, unique_code text);
+          CREATE TABLE order_items (
+            order_id int NOT NULL,
+            product_id int NOT NULL,
+            PRIMARY KEY (order_id, product_id),
+            FOREIGN KEY (product_id) REFERENCES products(id)
+          );
+          CREATE TABLE shipments (order_id int NOT NULL, carrier text);
+          ALTER TABLE ONLY shipments ADD CONSTRAINT shipments_pkey PRIMARY KEY (order_id);
+          ALTER TABLE order_items ADD CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id);
+          ALTER TABLE shipments ADD CONSTRAINT shipments_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id);
+          SQL
+          python plugins/marmalade/scripts/pg_erd.py --sql-file /tmp/join.sql -o /tmp/join.mmd
+          for want in 'orders ||--o{ order_items' 'products ||--o{ order_items' \
+                      'orders ||--|| shipments' 'text unique_code'; do
+            grep -qF -- "$want" /tmp/join.mmd || { echo "pg_erd: expected '$want'"; cat /tmp/join.mmd; exit 1; }
+          done
+
+          # The plugin's own scripts reach each other through sys.path, and the
+          # eval fixture is a package. Both must come out as a graph with edges.
           python plugins/marmalade/scripts/py_diagram.py plugins/marmalade/scripts -o /tmp/imports.mmd
           python plugins/marmalade/scripts/marmalade_lint.py /tmp/imports.mmd --errors-only
+          grep -q -- '-->' /tmp/imports.mmd || { echo "py_diagram drew no edges for a sys.path layout"; exit 1; }
+          python plugins/marmalade/scripts/py_diagram.py \
+            plugins/marmalade/evals/code-to-diagram/files/orderflow -o /tmp/pkg.mmd
+          grep -q -- '-->' /tmp/pkg.mmd || { echo "py_diagram collapsed a package to nothing"; exit 1; }
+
+      - name: Sync agrees with export
+        run: |
+          # An artifact exported from a Markdown fence has a source. Sync used to
+          # call it an orphan while `export --check` called it current.
+          python - <<'PY'
+          import hashlib, json, os, subprocess, sys, tempfile
+
+          S = os.path.abspath("plugins/marmalade/scripts")
+          fence = "flowchart LR\n  accTitle: t\n  accDescr: d\n  A[Cart] -->|pays| B[Bank]"
+          digest = hashlib.sha256(fence.encode()).hexdigest()[:16]
+          with tempfile.TemporaryDirectory() as d:
+              os.makedirs(os.path.join(d, "docs/diagrams/rendered"))
+              open(os.path.join(d, "docs/diagrams/notes.md"), "w").write(
+                  "# Notes\n\n```mermaid id=checkout\n" + fence + "\n```\n")
+              open(os.path.join(d, "docs/diagrams/rendered/checkout.svg"), "w").write("<svg/>")
+              json.dump({"version": 1, "entries": {"checkout.svg": {
+                  "digest": digest, "theme": "light", "source": "docs/diagrams/notes.md"}}},
+                  open(os.path.join(d, "docs/diagrams/rendered/.marmalade-manifest.json"), "w"))
+              env = {k: v for k, v in os.environ.items()
+                     if not k.startswith(("MARMALADE_", "CLAUDE_PLUGIN_OPTION_"))}
+              for script, args in (("marmalade_export.py", ["--check"]), ("docs_sync.py", [])):
+                  p = subprocess.run([sys.executable, os.path.join(S, script)] + args,
+                                     cwd=d, env=env, capture_output=True, text=True)
+                  if p.returncode != 0:
+                      sys.exit(f"{script} reports drift on an in-sync tree:\n{p.stdout}{p.stderr}")
+              # The Stop hook must agree, whatever the timestamps say.
+              os.utime(os.path.join(d, "docs/diagrams/rendered/checkout.svg"), (0, 0))
+              p = subprocess.run([sys.executable, os.path.join(S, "hooks/check_drift.py")],
+                                 input=json.dumps({"cwd": d}), env=env, capture_output=True, text=True)
+              if p.stdout.strip():
+                  sys.exit(f"check_drift reports drift the manifest does not: {p.stdout}")
+          print("export, sync and the Stop hook agree")
+          PY
+
+      - name: Contrast checker refuses to pass on nothing
+        run: |
+          echo '{"themeVariables":{"primaryColor":"#777777"}}' > /tmp/empty-theme.json
+          if python plugins/marmalade/scripts/check_contrast.py /tmp/empty-theme.json; then
+            echo "check_contrast passed a theme with no checkable pairs"; exit 1
+          fi

@@ -202,7 +202,7 @@ Four, so the standard holds without anyone remembering it:
 - **SessionStart** — reports the repo's Mermaid setup, and stays silent in repos
   that have none.
 - **Stop** — reports diagrams whose rendered artifacts have drifted from their
-  source. Never blocks.
+  source, once per session. Never blocks.
 
 ## The toolchain
 
@@ -253,6 +253,7 @@ Set at install through `/plugin`:
 | `export_dir` | `docs/diagrams/rendered` | Where artifacts are written |
 | `default_theme` | `light` | Preset used when none is named |
 | `export_formats` | `svg` | Formats a plain export produces |
+| `detail` | `balanced` | Density budget the rubric scores against |
 | `strict_validation` | `true` | Block writes that fail Mermaid validation |
 | `secret_scan` | `true` | Scan diagrams for credentials before writing |
 
@@ -270,7 +271,7 @@ plugins/marmalade/
 ├── .claude-plugin/plugin.json
 ├── skills/          10 skills, with progressive-disclosure references
 ├── agents/          12 subagents
-├── commands/        8 slash commands
+├── commands/        9 slash commands
 ├── hooks/hooks.json
 ├── scripts/         the deterministic toolchain
 └── assets/

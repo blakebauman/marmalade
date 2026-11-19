@@ -49,8 +49,9 @@ output for a bot comment.
 
 ## The Stop hook
 
-A `Stop` hook runs the same check at the end of every turn and reports drift as a
-notice. It never blocks. It exists so that a session that edited a `.mmd` and
+A `Stop` hook runs the same check at the end of a turn and reports drift as a
+notice. It never blocks, and it reports a given finding once per session rather
+than repeating it every turn. It exists so that a session that edited a `.mmd` and
 forgot to re-render says so before you move on, rather than three weeks later.
 
 It compares against the manifest when one exists and falls back to modification

@@ -21,7 +21,9 @@ python3 "${CLAUDE_PLUGIN_ROOT}/scripts/py_diagram.py" src/myapp --level package 
 
 Reads imports with `ast` — nothing is imported or executed. Only *internal*
 imports are drawn; stdlib and third-party packages are noise in an architecture
-diagram.
+diagram. A directory of scripts that reach each other through `sys.path` rather
+than a package (`lib/slop.py` imported as `import slop`) is resolved too.
+`--package-depth` counts levels below the directory you scanned.
 
 **The budget is enforced, not suggested.** At `--level auto` (the default), if the
 module graph exceeds the detail budget the tool collapses to package level and

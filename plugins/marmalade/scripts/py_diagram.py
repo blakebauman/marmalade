@@ -21,8 +21,10 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent / "lib"))
+from fswalk import sorted_files  # noqa: E402
+
 BUDGETS = {"simplified": 7, "balanced": 12, "faithful": 24}
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "build", "dist", ".tox", ".mypy_cache"}
 
 
 def module_name(path: Path, root: Path, prefix: str) -> str:
@@ -44,9 +46,7 @@ def collect_modules(root: Path) -> tuple[dict[str, Path], set[str]]:
     prefix = root.name if (root / "__init__.py").is_file() else ""
     modules: dict[str, Path] = {}
     packages: set[str] = set()
-    for path in sorted(root.rglob("*.py")):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
+    for path in sorted_files(root, (".py",)):
         name = module_name(path, root, prefix)
         modules[name] = path
         if path.name == "__init__.py":
@@ -54,7 +54,24 @@ def collect_modules(root: Path) -> tuple[dict[str, Path], set[str]]:
     return modules, packages
 
 
-def imports_of(path: Path, own_module: str, known: set[str], is_package: bool) -> set[str]:
+def loose_modules(modules: dict[str, Path]) -> dict[str, str]:
+    """Bare name -> module, for modules reachable only by a `sys.path` entry.
+
+    A scripts directory that is not a package (`lib/slop.py`, no `__init__.py`)
+    is imported as `import slop` after a `sys.path.insert`, never as `lib.slop`.
+    Without this the graph of such a tree has every node and no edges. Only
+    unambiguous names are kept, and only from directories that are not
+    packages, so a real package's `email.py` never captures `import email`.
+    """
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for name, path in modules.items():
+        if "." in name and path.name != "__init__.py" and not (path.parent / "__init__.py").is_file():
+            by_name[path.stem].append(name)
+    return {bare: names[0] for bare, names in by_name.items() if len(names) == 1}
+
+
+def imports_of(path: Path, own_module: str, known: set[str], is_package: bool,
+               loose: dict[str, str] | None = None) -> set[str]:
     """Internal imports only — third-party and stdlib are noise in an architecture diagram."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=str(path))
@@ -72,6 +89,8 @@ def imports_of(path: Path, own_module: str, known: set[str], is_package: bool) -
             if candidate in known:
                 found.add(candidate)
                 return
+        if loose and parts[0] in loose:
+            found.add(loose[parts[0]])
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -145,7 +164,8 @@ def main() -> int:
     ap.add_argument("--detail", default="balanced", choices=sorted(BUDGETS), help="Density budget. Default balanced.")
     ap.add_argument("--level", choices=("auto", "module", "package"), default="auto",
                     help="Granularity. 'auto' collapses to package when the module graph busts the budget.")
-    ap.add_argument("--package-depth", type=int, default=1, help="Dotted-path depth when collapsing. Default 1.")
+    ap.add_argument("--package-depth", type=int, default=1,
+                    help="Levels below the scanned root to keep when collapsing. Default 1.")
     ap.add_argument("--title", default=None)
     ap.add_argument("-o", "--output", help="Write here instead of stdout.")
     args = ap.parse_args()
@@ -159,9 +179,10 @@ def main() -> int:
         raise SystemExit(f"No .py files under {args.root}.")
 
     known = set(modules)
+    loose = loose_modules(modules)
     raw: dict[str, set[str]] = {}
     for name, path in modules.items():
-        targets = imports_of(path, name, known, name in packages)
+        targets = imports_of(path, name, known, name in packages, loose)
         if targets:
             raw[name] = targets
 
@@ -177,7 +198,10 @@ def main() -> int:
         collapsed_from = len(modules)
 
     if level == "package":
-        depth = args.package_depth
+        # When the root is itself a package every module name starts with it,
+        # so depth 1 would collapse the whole graph into that one node. Depth
+        # counts levels below the root package.
+        depth = args.package_depth + (1 if (root / "__init__.py").is_file() else 0)
         edges: dict[str, set[str]] = defaultdict(set)
         for source, targets in raw.items():
             s = to_package(source, depth)

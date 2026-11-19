@@ -7,8 +7,10 @@ allowed-tools: Bash, Read, Grep, Glob, Agent
 Check diagram/doc drift under `$ARGUMENTS` (default: the repository root).
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/scripts/docs_sync.py" --docs $ARGUMENTS
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/docs_sync.py" --docs <docs root>
 ```
+
+Use `.` as the docs root when no argument was given.
 
 Five kinds of drift, detected by content hash rather than modification time:
 **stale**, **unrendered**, **orphaned**, **broken** links, and **unused**

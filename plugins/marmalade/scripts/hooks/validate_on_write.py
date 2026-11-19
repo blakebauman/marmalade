@@ -24,12 +24,42 @@ def _lint_cli() -> str:
     return str(Path(__file__).resolve().parent.parent / "marmalade_lint.py")
 
 
+def edit_fragments(event: dict):
+    """The replacement strings of an Edit, or None for a whole-file write."""
+    tool_input = event.get("tool_input") or {}
+    if isinstance(tool_input.get("content"), str):
+        return None
+    fragments = [tool_input.get(k) for k in ("new_string", "new_str")]
+    for edit in tool_input.get("edits") or []:
+        if isinstance(edit, dict):
+            fragments.append(edit.get("new_string"))
+    fragments = [f for f in fragments if isinstance(f, str)]
+    return fragments or None
+
+
+def touched_by(block, fragments) -> bool:
+    """Whether an edit plausibly changed this fenced block.
+
+    A Markdown file can hold many diagrams. An edit to one of them, or to the
+    prose between them, must not be blocked over an error that was already
+    sitting in another.
+    """
+    if fragments is None or block.origin == "file":
+        return True
+    block_lines = {line.strip() for line in block.lines if line.strip()}
+    for fragment in fragments:
+        if any(line.strip() in block_lines for line in fragment.splitlines() if line.strip()):
+            return True
+    return False
+
+
 def main() -> int:
     event = read_event()
     strict = flag("strict_validation", True)
 
     errors: list[str] = []
     warnings: list[str] = []
+    fragments = edit_fragments(event)
 
     for path in edited_paths(event):
         if not is_diagram_carrier(path):
@@ -38,11 +68,17 @@ def main() -> int:
         if text is None:
             continue
         for block in extract_blocks(path, text):
+            ours = touched_by(block, fragments)
             for f in lint(block):
                 line = f"{path}:{f.line}  {f.code}  {f.message}"
                 if f.hint:
                     line += f"\n    → {f.hint}"
-                (errors if f.severity == "error" else warnings if f.severity == "warning" else []).append(line)
+                if f.severity == "error" and ours:
+                    errors.append(line)
+                elif f.severity == "error":
+                    warnings.append(line + "  (already present; not from this edit)")
+                elif f.severity == "warning":
+                    warnings.append(line)
 
     if not errors and not warnings:
         return 0

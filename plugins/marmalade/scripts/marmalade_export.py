@@ -27,12 +27,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
 import config  # noqa: E402
+from fswalk import sorted_files  # noqa: E402
 from mermaid_lint import Block, extract_blocks, lint  # noqa: E402
 
 THEME_DIR = Path(__file__).resolve().parent.parent / "assets" / "themes"
 PRESETS = {"light", "dark", "high-contrast", "colorblind-safe", "print"}
 MANIFEST_NAME = ".marmalade-manifest.json"
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 SCANNABLE = (".mmd", ".mermaid", ".md", ".markdown", ".mdx", ".qmd")
 
 # ```mermaid id=checkout  →  the block renders to checkout.svg instead of doc-1.svg
@@ -63,11 +63,7 @@ def collect(roots: list[str]) -> list[Path]:
         if p.is_file():
             files.append(p)
         elif p.is_dir():
-            for child in sorted(p.rglob("*")):
-                if any(part in SKIP_DIRS for part in child.parts):
-                    continue
-                if child.is_file() and child.suffix.lower() in SCANNABLE:
-                    files.append(child)
+            files.extend(sorted_files(p, SCANNABLE))
     return files
 
 
@@ -184,6 +180,24 @@ def render(
     return True, ""
 
 
+def render_fingerprint(theme: Path, background: str, scale: float, width, css) -> str:
+    """Hash of everything besides the source that decides what a render looks like.
+
+    The theme is hashed by content, so editing a brand theme, or a preset
+    changing in a plugin update, makes its renders stale. Scale and width are
+    included because they change a PNG as surely as the source does.
+    """
+    h = hashlib.sha256()
+    for path in (theme, css):
+        try:
+            h.update(Path(path).read_bytes() if path else b"")
+        except OSError:
+            pass
+        h.update(b"\0")
+    h.update(f"{background}|{scale}|{width}".encode("utf-8"))
+    return h.hexdigest()[:16]
+
+
 # --- manifest ----------------------------------------------------------------
 
 
@@ -254,6 +268,8 @@ def main() -> int:
 
     manifest = load_manifest(out_dir)
     entries = manifest.setdefault("entries", {})
+    css = Path(args.css) if args.css else None
+    fingerprint = render_fingerprint(theme_path, background, args.scale, args.width, css)
 
     stale: list[str] = []
     for job in jobs:
@@ -261,7 +277,11 @@ def main() -> int:
             key = f"{job.stem}.{fmt}"
             recorded = entries.get(key, {})
             target = out_dir / key
-            if recorded.get("digest") != job.digest or recorded.get("theme") != theme_name or not target.exists():
+            # An entry written before fingerprints existed has none; it is not
+            # treated as stale for that alone, or an upgrade would re-render everything.
+            options_changed = "render" in recorded and recorded["render"] != fingerprint
+            if (recorded.get("digest") != job.digest or recorded.get("theme") != theme_name
+                    or options_changed or not target.exists()):
                 stale.append(key)
 
     if args.check:
@@ -285,7 +305,6 @@ def main() -> int:
         )
         return 2
 
-    css = Path(args.css) if args.css else None
     puppeteer = Path(args.puppeteer_config) if args.puppeteer_config else None
 
     rendered: list[str] = []
@@ -304,6 +323,7 @@ def main() -> int:
                     "source": str(job.source_path),
                     "digest": job.digest,
                     "theme": theme_name,
+                    "render": fingerprint,
                     "origin": job.block.origin,
                     "line_offset": job.block.line_offset,
                 }

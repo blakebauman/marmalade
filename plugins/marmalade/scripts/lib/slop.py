@@ -34,8 +34,9 @@ FILLER_LABELS = {
     "node", "box", "block", "element", "entity", "object", "task", "action",
 }
 
-# Words that make a label sound technical without adding information.
-HEDGE_WORDS = {"various", "multiple", "several", "some", "many", "etc.", "and more", "..."}
+# Words that make a label sound technical without adding information. Matched
+# as whole words: "some" must not fire on "Awesome API".
+_HEDGE = re.compile(r"(?<!\w)(?:various|multiple|several|some|many|and more)(?!\w)|\betc\.|\.\.\.|…", re.IGNORECASE)
 
 _CLASSDEF = re.compile(r"^\s*classDef\s+([\w-]+)\s+(.*)$")
 _STYLE = re.compile(r"^\s*style\s+([\w-]+)\s+(.*)$")
@@ -103,6 +104,107 @@ def _nodes(body: list[tuple[int, str]]) -> set[str]:
     return ids
 
 
+_NODE_ID = r"[A-Za-z_][\w-]*"
+# Shape openers, longest first, as they follow a node id.
+_SHAPE = re.compile(r"(?<![\w-])" + _NODE_ID + r"\s*(\[\[|\[\(|\(\(|\{\{|\(\[|\[/|\[\\|>|\[|\(|\{)")
+_SHAPE_ATTR = re.compile(r"@\{[^}]*\bshape\s*:\s*([\w-]+)")
+_NOT_NODE_LINES = ("classDef", "class", "style", "linkStyle", "click", "direction", "subgraph", "end")
+
+
+def _blank_edges(text: str) -> str:
+    """Blank edge operators and |edge labels| so only node text is left."""
+    cleaned = _EDGE.sub(lambda m: " " * len(m.group(0)), _mask_labels(text))
+    return _EDGE_LABEL.sub(lambda m: " " * len(m.group(0)), cleaned)
+
+
+def _shapes(body: list[tuple[int, str]]) -> set[str]:
+    """The distinct node shapes a flowchart uses.
+
+    Read from node definitions only. Scanning raw lines instead counts the `>`
+    of every `-->` as a shape, which hid uniform diagrams and flagged varied ones.
+    """
+    shapes: set[str] = set()
+    for _idx, text in body:
+        first = text.split()[0] if text.split() else ""
+        if first in _NOT_NODE_LINES:
+            continue
+        shapes.update(_SHAPE.findall(_blank_edges(text)))
+        shapes.update("@" + name for name in _SHAPE_ATTR.findall(text))
+    return shapes
+
+
+def _flow_edges(body: list[tuple[int, str]]) -> tuple[list[tuple[str, str]], bool]:
+    """(source, target) pairs of a flowchart, and whether any line fans out with `&`."""
+    edges: list[tuple[str, str]] = []
+    fans = False
+    for _idx, text in body:
+        first = text.split()[0] if text.split() else ""
+        if first in _NOT_NODE_LINES:
+            continue
+        masked = _EDGE_LABEL.sub(" ", _mask_labels(text))
+        if not _EDGE.search(masked):
+            continue
+        groups: list[list[str]] = []
+        for segment in _EDGE.split(masked):
+            if _EDGE.fullmatch(segment.strip()):
+                continue
+            ids = []
+            for part in segment.split("&"):
+                m = re.match(r"\s*(" + _NODE_ID + ")", part)
+                if m:
+                    ids.append(m.group(1))
+            if len(ids) > 1:
+                fans = True
+            groups.append(ids)
+        for left, right in zip(groups, groups[1:]):
+            edges.extend((a, b) for a in left for b in right)
+    return edges, fans
+
+
+_SEQ_PARTICIPANT = re.compile(r"^(?:create\s+)?(?:participant|actor)\s+(\S+)")
+_SEQ_MESSAGE = re.compile(r"^(.+?)\s*(?:<<-->>|<<->>|-->>|->>|-->|->|--x|-x|--\)|-\))\s*[+-]?\s*(.+?)\s*:")
+_CLASS_DECL = re.compile(r"^class\s+(" + _NODE_ID + ")")
+_CLASS_REL = re.compile(
+    r"^(" + _NODE_ID + r")\s*(?:\"[^\"]*\"\s*)?[<|*o]*(?:--|\.\.)[>|*o]*\s*(?:\"[^\"]*\"\s*)?(" + _NODE_ID + ")"
+)
+
+
+def _graph(parsed) -> tuple[set[str], list[tuple[int, str]]]:
+    """(nodes, edge lines) for the diagram family.
+
+    Sequence and class diagrams have their own node and edge grammar; reading
+    them with the flowchart rules counted a 20-class diagram as zero nodes.
+    """
+    body = parsed.body
+    if parsed.diagram_type == "sequence":
+        nodes: set[str] = set()
+        edge_lines = []
+        for idx, text in body:
+            decl = _SEQ_PARTICIPANT.match(text)
+            if decl:
+                nodes.add(decl.group(1))
+                continue
+            msg = _SEQ_MESSAGE.match(text)
+            if msg:
+                nodes.update((msg.group(1).strip(), msg.group(2).strip()))
+                edge_lines.append((idx, text))
+        return nodes, edge_lines
+    if parsed.diagram_type == "class":
+        nodes = set()
+        edge_lines = []
+        for idx, text in body:
+            decl = _CLASS_DECL.match(text)
+            if decl:
+                nodes.add(decl.group(1))
+                continue
+            rel = _CLASS_REL.match(text)
+            if rel:
+                nodes.update(rel.groups())
+                edge_lines.append((idx, text))
+        return nodes, edge_lines
+    return _nodes(body), [(i, t) for i, t in body if _EDGE.search(_mask_labels(t))]
+
+
 def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
     parsed = _parse(block)
     ln = block.line_offset
@@ -110,9 +212,8 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
     body = parsed.body
     findings: list[Finding] = []
 
-    nodes = _nodes(body)
+    nodes, edge_lines = _graph(parsed)
     labels = _labels(body)
-    edge_lines = [(i, t) for i, t in body if _EDGE.search(_mask_labels(t))]
     budget = BUDGETS.get(detail, BUDGETS[DEFAULT_DETAIL])
 
     # --- SLOP001: over budget -------------------------------------------------
@@ -146,7 +247,7 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
     # --- SLOP003: hedge words -------------------------------------------------
     for idx, label in labels:
         low = label.lower()
-        if any(h in low for h in HEDGE_WORDS):
+        if _HEDGE.search(low):
             findings.append(
                 Finding(
                     line=ln + idx + 1,
@@ -168,29 +269,30 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
                 return bool(_EDGE_LABEL.search(t)) or bool(re.search(r"-{2,}\s+\S.*?-{2,}>", t))
         else:
             def _is_labeled(t: str) -> bool:
-                after = _EDGE.split(t)[-1]
-                return ":" in after and after.split(":", 1)[1].strip() != ""
+                # The label follows the first colon outside a quoted string.
+                after = _mask_labels(t)
+                return ":" in after and t[after.index(":") + 1:].strip() != ""
 
-        labeled = sum(1 for _i, t in edge_lines if _is_labeled(t))
-        ratio = labeled / len(edge_lines)
-        if ratio < 0.34 and len(edge_lines) >= 4:
+        # Inheritance and realization say what they mean without a label.
+        judged = [
+            (i, t) for i, t in edge_lines
+            if not (parsed.diagram_type == "class" and ("<|" in t or "|>" in t))
+        ]
+        labeled = sum(1 for _i, t in judged if _is_labeled(t))
+        ratio = labeled / len(judged) if judged else 1.0
+        if ratio < 0.34 and len(judged) >= 4:
             findings.append(
                 Finding(
                     line=header,
                     severity="warning",
                     code="SLOP004",
-                    message=f"Only {labeled} of {len(edge_lines)} edges say what they mean.",
+                    message=f"Only {labeled} of {len(judged)} edges say what they mean.",
                     hint="An unlabeled arrow asserts 'related somehow'. Label the verb — 'publishes', 'reads from', 'falls back to' — or drop the edge.",
                 )
             )
 
     # --- SLOP005: one shape for everything -----------------------------------
-    shapes = set()
-    for _idx, text in body:
-        for token in ("[[", "[(", "((", "{{", "([", "[/", "[\\", ">", "[", "(", "{"):
-            if token in text:
-                shapes.add(token)
-                break
+    shapes = _shapes(body)
     if parsed.diagram_type in ("flowchart", "block") and len(nodes) >= 6 and len(shapes) <= 1:
         findings.append(
             Finding(
@@ -251,9 +353,25 @@ def check(block: Block, detail: str = DEFAULT_DETAIL) -> SlopReport:
         )
 
     # --- SLOP009: linear chain that should be a sentence ----------------------
-    if 2 <= len(nodes) <= 4 and len(edge_lines) <= 3 and parsed.diagram_type == "flowchart":
-        branching = any(len(_EDGE.findall(t)) > 1 for _i, t in edge_lines)
-        if not branching:
+    # A chain: every node has at most one way in and one way out, and it does
+    # not loop. `A --> B --> C` on one line is a chain; `A --> B` plus `A --> C`
+    # is a branch, however few nodes it has.
+    if 2 <= len(nodes) <= 4 and parsed.diagram_type == "flowchart":
+        flow, fans = _flow_edges(body)
+        pairs = set(flow)
+        out_deg: dict[str, int] = {}
+        in_deg: dict[str, int] = {}
+        for a, b in pairs:
+            out_deg[a] = out_deg.get(a, 0) + 1
+            in_deg[b] = in_deg.get(b, 0) + 1
+        is_chain = (
+            bool(pairs)
+            and not fans
+            and len(pairs) == len(nodes) - 1
+            and all(v <= 1 for v in out_deg.values())
+            and all(v <= 1 for v in in_deg.values())
+        )
+        if is_chain:
             findings.append(
                 Finding(
                     line=header,

@@ -17,43 +17,46 @@ Exit 1 if anything drifted, so this runs as a CI gate.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent / "lib"))
+sys.path.insert(0, str(Path(__file__).parent))
 import config  # noqa: E402
-from mermaid_lint import extract_blocks  # noqa: E402
+from fswalk import sorted_files  # noqa: E402
+from marmalade_export import build_jobs, collect, dedupe_stems  # noqa: E402
 
 MANIFEST_NAME = ".marmalade-manifest.json"
 RENDERED_EXT = (".svg", ".png", ".pdf")
 DOC_EXT = (".md", ".markdown", ".mdx", ".qmd", ".rst", ".html")
-SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "dist", "build", ".next", "target", "__pycache__"}
 
 IMAGE_REF = re.compile(r"!\[[^\]]*\]\(([^)\s]+)|<img[^>]+src=[\"']([^\"']+)[\"']|:::\s*image\s+source=[\"']([^\"']+)")
 
 
 def walk(root: Path, exts: tuple[str, ...]) -> list[Path]:
-    out = []
-    if not root.is_dir():
-        return out
-    for path in sorted(root.rglob("*")):
-        if any(part in SKIP_DIRS for part in path.parts):
-            continue
-        if path.is_file() and path.suffix.lower() in exts:
-            out.append(path)
-    return out
+    return sorted_files(root, exts)
 
 
-def source_digests(diagram_dir: Path) -> dict[str, str]:
-    """stem -> content hash, matching how marmalade_export names its outputs."""
-    digests: dict[str, str] = {}
-    for path in walk(diagram_dir, (".mmd", ".mermaid")):
-        for block in extract_blocks(str(path), path.read_text(encoding="utf-8", errors="replace")):
-            digests[path.stem] = hashlib.sha256(block.source.encode("utf-8")).hexdigest()[:16]
-    return digests
+def source_digests(diagram_dir: Path, manifest: dict) -> dict[str, str]:
+    """Output stem -> content hash, for every diagram the exporter would render.
+
+    Built by the exporter's own job list rather than a second guess at its
+    naming, so a fenced block rendered to `checkout.svg` and a deduplicated
+    `flow-2.svg` are recognized as having a source. Files outside the diagram
+    directory that the manifest says were exported are included too.
+    """
+    files = collect([str(diagram_dir)])
+    known = {f.resolve() for f in files}
+    for entry in manifest.values():
+        source = Path(str(entry.get("source") or "")) if isinstance(entry, dict) else None
+        if source and source.is_file() and source.resolve() not in known:
+            known.add(source.resolve())
+            files.append(source)
+    jobs = build_jobs(files)
+    dedupe_stems(jobs)
+    return {job.stem: job.digest for job in jobs}
 
 
 def main() -> int:
@@ -66,11 +69,13 @@ def main() -> int:
 
     diagram_dir, rendered_dir, docs_root = Path(args.diagrams), Path(args.rendered), Path(args.docs)
 
-    digests = source_digests(diagram_dir)
     try:
         manifest = json.loads((rendered_dir / MANIFEST_NAME).read_text(encoding="utf-8")).get("entries", {})
     except Exception:
         manifest = {}
+    if not isinstance(manifest, dict):
+        manifest = {}
+    digests = source_digests(diagram_dir, manifest)
 
     artifacts = [p for p in walk(rendered_dir, RENDERED_EXT)]
     artifact_names = {p.name for p in artifacts}

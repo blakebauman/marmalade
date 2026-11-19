@@ -19,6 +19,10 @@ from _hookio import edited_paths, emit, flag, is_diagram_carrier, read_event  # 
 
 from mermaid_lint import DIAGRAM_TYPES, extract_blocks  # noqa: E402
 
+# A value after `password:` that is a type name, not a secret: the attribute
+# list of a class diagram reads `+password: PasswordHash`.
+TYPE_NAME = re.compile(r"[A-Z][A-Za-z]*")
+
 # (label, pattern, why it matters). Ordered most-specific first.
 PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("AWS access key id", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"), "a live AWS key"),
@@ -26,6 +30,7 @@ PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
     ("Slack token", re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}\b"), "a Slack token"),
     ("Stripe secret key", re.compile(r"\b[sr]k_(?:live|test)_[A-Za-z0-9]{16,}\b"), "a Stripe key"),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "a Google API key"),
+    ("API secret key", re.compile(r"\bsk-(?:[a-z]+-)*[A-Za-z0-9_-]{20,}"), "an sk-… secret key"),
     ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "a private key"),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b"), "a signed token"),
     (
@@ -37,14 +42,20 @@ PATTERNS: list[tuple[str, re.Pattern[str], str]] = [
         "inline credential",
         re.compile(
             r"\b(?:password|passwd|secret|api[_-]?key|access[_-]?token|client[_-]?secret)\b\s*[:=]\s*"
-            r"[\"']?[A-Za-z0-9/+_.-]{8,}",
+            r"[\"']?(?P<value>[A-Za-z0-9/+_.-]{8,})",
             re.IGNORECASE,
         ),
         "a hardcoded credential",
     ),
     (
         "internal hostname",
-        re.compile(r"\b[a-z0-9][a-z0-9-]{1,62}\.(?:internal|intranet|corp|local|lan|home\.arpa)\b", re.IGNORECASE),
+        # Anchored to the start of the whole name and to its end, so a dotfile
+        # (`.env.local`) or a filename (`settings.local.json`) is not a hostname.
+        re.compile(
+            r"(?<![\w.-])(?:[a-z0-9][a-z0-9-]{0,62}\.)+(?:internal|intranet|corp|local|lan|home\.arpa)\b"
+            r"(?!\.[a-z0-9])",
+            re.IGNORECASE,
+        ),
         "an internal DNS name that maps your private network",
     ),
 ]
@@ -57,6 +68,9 @@ DOC_NETS = [
     ipaddress.ip_network("2001:db8::/32"),
 ]
 IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
+IPV6 = re.compile(r"(?<![\w:.])[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{0,4}){2,7}(?![\w:])")
+# Unique local addresses: the IPv6 counterpart of RFC 1918.
+ULA = ipaddress.ip_network("fc00::/7")
 # A trailing /nn makes it a CIDR block: the shape of a network, not a machine on it.
 CIDR_SUFFIX = re.compile(r"\s*/\s*\d{1,2}\b")
 
@@ -85,14 +99,27 @@ def private_ips(text: str) -> list[str]:
             continue
         if addr.is_private and not addr.is_loopback and not addr.is_unspecified:
             found.append(match.group(0))
+    for match in IPV6.finditer(text):
+        if CIDR_SUFFIX.match(text, match.end()):
+            continue
+        try:
+            addr6 = ipaddress.IPv6Address(match.group(0))
+        except ValueError:
+            continue  # `A:::focal`, a clock time, anything else with colons
+        if addr6 in ULA:
+            found.append(match.group(0))
     return found
 
 
 def scan(text: str) -> list[str]:
     hits: list[str] = []
     for label, pattern, why in PATTERNS:
-        if pattern.search(text):
+        for match in pattern.finditer(text):
+            value = match.groupdict().get("value")
+            if value is not None and TYPE_NAME.fullmatch(value):
+                continue
             hits.append(f"{label} — looks like {why}")
+            break
     ips = sorted(set(private_ips(text)))
     if ips:
         hits.append(
@@ -103,7 +130,8 @@ def scan(text: str) -> list[str]:
 
 def looks_like_mermaid(text: str) -> bool:
     """Whether a fragment that did not parse as a block is still diagram source."""
-    if "```mermaid" in text.lower():
+    lowered = text.lower()
+    if "```mermaid" in lowered or "{mermaid" in lowered or "~~~mermaid" in lowered:
         return True
     for line in text.splitlines():
         stripped = line.strip()
@@ -111,6 +139,36 @@ def looks_like_mermaid(text: str) -> bool:
             if stripped == keyword or stripped.startswith(keyword + " "):
                 return True
     return False
+
+
+def edit_touches_diagram(path: str, tool_input: dict):
+    """Whether an Edit to a Markdown file changes any Mermaid block in it.
+
+    An edit fragment is often one line from the middle of a fence, with no
+    fence marker and no diagram keyword to recognize it by. So apply the edit
+    to the file as it is on disk and compare the diagrams before and after.
+    Returns None when that cannot be done (no file yet, text not found).
+    """
+    edits = []
+    if isinstance(tool_input.get("old_string"), str):
+        edits.append((tool_input["old_string"], tool_input.get("new_string"), tool_input.get("replace_all")))
+    for edit in tool_input.get("edits") or []:
+        if isinstance(edit, dict) and isinstance(edit.get("old_string"), str):
+            edits.append((edit["old_string"], edit.get("new_string"), edit.get("replace_all")))
+    if not edits:
+        return None
+    try:
+        before = Path(path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    after = before
+    for old, new, replace_all in edits:
+        if not old or not isinstance(new, str) or old not in after:
+            return None
+        after = after.replace(old, new) if replace_all else after.replace(old, new, 1)
+    sources_before = [b.source for b in extract_blocks(path, before)]
+    sources_after = [b.source for b in extract_blocks(path, after)]
+    return sources_before != sources_after
 
 
 def main() -> int:
@@ -132,10 +190,17 @@ def main() -> int:
         return 0
 
     path = paths[0]
+    is_source = path.lower().endswith((".mmd", ".mermaid"))
+    touched = None if is_source else edit_touches_diagram(path, tool_input)
     blocks = extract_blocks(path, payload)
-    if blocks:
+    if touched is True:
+        # The edit lands inside a diagram: every word of it is diagram text.
+        scan_text = payload
+    elif touched is False:
+        return 0  # prose around the diagrams; not this scanner's business
+    elif blocks:
         scan_text = "\n".join(b.source for b in blocks)
-    elif path.lower().endswith((".mmd", ".mermaid")):
+    elif is_source:
         # The whole file is a diagram, even if an Edit fragment does not parse.
         scan_text = payload
     elif looks_like_mermaid(payload):

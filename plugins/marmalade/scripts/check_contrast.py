@@ -102,6 +102,12 @@ def main() -> int:
         if not passed:
             failures.append((fg_key, bg_key, ratio, threshold))
 
+    if not rows:
+        raise SystemExit(
+            f"{args.config}: no checkable color pairs. Define a text color and its background "
+            "(for example primaryTextColor and primaryColor) as hex values."
+        )
+
     if args.json:
         print(json.dumps({
             "config": args.config, "level": args.level,

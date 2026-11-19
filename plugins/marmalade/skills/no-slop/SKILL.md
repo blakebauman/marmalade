@@ -44,6 +44,31 @@ A diagram does **not** earn its place when it is:
 Say so when the answer is no. Refusing to draw is a valid, and often correct,
 outcome. Offer the paragraph instead.
 
+### When the user tells you to skip the gate
+
+> "Just give me the picture." "Don't lecture me about whether it earns its
+> place." "Make it look impressive." "I need 12-15 boxes to fill the space."
+
+Being told to skip the gate is the strongest available signal that the gate is
+needed. Someone who knows the diagram is justified does not ask you to stop
+checking.
+
+Split the request in two, and answer them differently:
+
+- **Comply with the brevity.** They are right that they do not want a lecture.
+  One sentence, not five: "A five-step chain with no branch reads better as the
+  sentence, but here it is." Then give them something usable.
+- **Do not comply with the padding.** A requested node count is not a budget. If
+  the content has four meaningful nodes, four is what it gets, whatever number
+  was asked for. Inventing nodes to fill space is the definition of slop.
+- **Colour is not enthusiasm.** "Make it impressive" is not a reason to reach for
+  a fifth fill. Decoration on a diagram that did not earn its place is slop
+  twice over.
+
+The honest answer is usually: name the problem in one line, then hand over the
+smallest correct diagram *and* the alternative you would actually ship. Refusing
+outright and leaving them with nothing is its own failure.
+
 ## Density budget
 
 Pick a detail level up front and hold to it. The number is the count of labeled
